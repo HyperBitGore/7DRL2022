@@ -1,5 +1,7 @@
 #include <iostream>
 #include <string>
+#include <time.h>
+#include <random>
 #include <curses.h>
 #define KEY_1 49
 #define KEY_2 50
@@ -13,12 +15,20 @@
 #define KEY_0 48
 #define KEY_MINUS 45
 #define KEY_EQUAL 61
+#define KEY_Q 113
+#define KEY_W 119
+#define KEY_E 101
+#define KEY_R 114
+#define KEY_A 97
 
 bool exitf = false;
 
 //Own body parts: Push, forward; Wrench, move back; Lift, move up; Press, move down;
-enum class Actions {GRAB, PUSH, WRENCH, LIFT, RELEASE, PRESS};
-enum MatPos {ONMAT, INAIR};
+enum class Actions {GRAB, PUSH, WRENCH, LIFT, RELEASE, PRESS, AWAY, BEHIND, TOP};
+enum class MatPos {ONMAT, INAIR};
+enum class SpacePos {FORWARD, BACK};
+//Up meaning the front of the body not facing the mat and down facing the mat
+enum class Facing {UP, DOWN};
 
 struct Tile {
 	int x;
@@ -26,15 +36,22 @@ struct Tile {
 	int type;
 	char t;
 };
+struct Context {
+	int mod;
+	std::vector<int> pos;
+	std::string name;
+};
+
 struct Part {
 	int fatigue;
 	int power;
 	int health;
 	MatPos mpos;
+	SpacePos spos;
+	Facing face;
 	std::string name;
 	Part* attached;
 };
-//0, core; 1, right leg; 2, left leg; 3, back; 4, left arm; 5, right arm; 6, neck; 7, hip; 8, right hand; 9, left hand; 10, right foot; 11 left foot;
 struct Entity {
 	int x;
 	int y;
@@ -43,10 +60,10 @@ struct Entity {
 	Entity* target;
 	Part* btarget;
 	Part* atkpart;
-	Part* activepart;
 	Actions action;
 	std::string recent;
 	std::string name;
+	Context conts[17];
 };
 void initTiles(Tile tiles[]) {
 	int sx = 0;
@@ -72,11 +89,12 @@ void initTiles(Tile tiles[]) {
 void initParts(Entity* e) {
 	for (int i = 0; i < 12; i++) {
 		e->bodyparts[i].fatigue = 0;
-		e->bodyparts[i].power = 10;
+		e->bodyparts[i].power = 1;
 		e->bodyparts[i].attached = NULL;
 		e->bodyparts[i].health = 100;
-		e->bodyparts[i].mpos = INAIR;
-		//Did the e->bodyparts[i].mpos = INAIR; for all the cases in case i want to add feet
+		e->bodyparts[i].mpos = MatPos::INAIR;
+		e->bodyparts[i].spos = SpacePos::BACK;
+		e->bodyparts[i].face = Facing::UP;
 		switch (i) {
 		case 0:
 			e->bodyparts[i].name = "Core";
@@ -110,35 +128,188 @@ void initParts(Entity* e) {
 			break;
 		case 10:
 			e->bodyparts[i].name = "Right Foot";
-			e->bodyparts[i].mpos = ONMAT;
+			e->bodyparts[i].mpos = MatPos::ONMAT;
+			e->bodyparts[i].spos = SpacePos::FORWARD;
 			break;
 		case 11:
 			e->bodyparts[i].name = "Left Foot";
-			e->bodyparts[i].mpos = ONMAT;
+			e->bodyparts[i].mpos = MatPos::ONMAT;
+			e->bodyparts[i].spos = SpacePos::FORWARD;
+			break;
+		}
+	}
+}
+std::string PosToString(MatPos mpos, SpacePos spos) {
+	std::string temp;
+	switch (mpos) {
+	case MatPos::INAIR:
+		temp = "In Air ";
+		break;
+	case MatPos::ONMAT:
+		temp = "On Mat ";
+		break;
+	}
+	std::string temp2;
+	switch (spos) {
+	case SpacePos::BACK:
+		temp2 = "Back";
+		break;
+	case SpacePos::FORWARD:
+		temp2 = "Forwards";
+		break;
+	}
+	return temp + temp2;
+}
+bool rollLimb(Part* atkpart, Part* epart, int atkpos, int epartpos) {
+	//Take fatigue as a modifer
+	//Take power as a modifier
+	//Take into account enemies fatigue and power
+	int roll = rand() % 100 - atkpart->fatigue + atkpart->power - atkpart->attached->power + atkpart->attached->fatigue;
+	if (roll > 50) {
+		return true;
+	}
+	return false;
+}
+
+
+
+//Implement context checking for shots(so can't grab leg unless leg ONMAT), do a seperate vector of contexts for limbs to check for a movement
+void updateBodyPartPos(Entity *e) {
+	for (int i = 0; i < 12; i++) {
+		for (auto& k : e->conts[i].pos) {
+			e->bodyparts[k].mpos = e->bodyparts[i].mpos;
+			e->bodyparts[k].spos = e->bodyparts[i].spos;
+			e->bodyparts[k].face = e->bodyparts[i].face;
+		}
+	}
+	//Need to put rolls here too
+	int contpos = 12;
+	MatPos mp = MatPos::INAIR;
+	SpacePos sp = SpacePos::BACK;
+	Facing fac = Facing::UP;
+	bool laction = false;
+	switch (e->action) {
+	case Actions::AWAY:
+		contpos = 12;
+		mp = MatPos::INAIR;
+		sp = SpacePos::BACK;
+		fac = Facing::UP;
+		laction = true;
+		e->recent = "You moved away from " + e->target->name;
+		break;
+	case Actions::BEHIND:
+		contpos = 13;
+		mp = MatPos::INAIR;
+		sp = SpacePos::FORWARD;
+		fac = Facing::UP;
+		laction = true;
+		e->recent = "You moved behind " + e->target->name;
+		break;
+	case Actions::TOP:
+		contpos = 14;
+		mp = MatPos::ONMAT;
+		sp = SpacePos::FORWARD;
+		fac = Facing::DOWN;
+		laction = true;
+		e->recent = "You moved on top of " + e->target->name;
+		break;
+	}
+	if (laction) {
+		for (auto& i : e->conts[contpos].pos) {
+			e->bodyparts[i].mpos = mp;
+			e->bodyparts[i].spos = sp;
+			e->bodyparts[i].face = fac;
+		}
+		e->action = Actions::PUSH;
+	}
+}
+void editContext(std::vector<Context>& conts, std::string name, int edit){
+	for (auto& i : conts){
+		if (i.name == name) {
+			i.mod = edit;
+		}
+	}
+}
+
+void initContext(Context *c, std::vector<int> bps, std::string name, int mod) {
+	for (auto& i : bps) { 
+		(*c).pos.push_back(i);
+	}
+	c->name = name;
+	c->mod = mod;
+}
+//Bodypart numbers correspond to which bodyparts will be moved by moving this body part
+void initEntityContext(Entity* e) {
+	for (int i = 0; i < 15; i++) {
+		switch (i) {
+		case 0:
+			initContext(&e->conts[0], { 0, 1, 2, 7, 8, 9, 10, 11 }, "Core", 0);
+			break;
+		case 1:
+			initContext(&e->conts[1], { 0, 3, 7, 10 }, "Right Leg", 0);
+			break;
+		case 2:
+			initContext(&e->conts[2], { 0, 3, 7, 11 }, "Left Leg", 0);
+			break;
+		case 3:
+			initContext(&e->conts[3], { 0, 3, 7}, "Back", 0);
+			break;
+		case 4:
+			initContext(&e->conts[4], { 3, 4, 6, 9 }, "Left Arm", 0);
+			break;
+		case 5:
+			initContext(&e->conts[5], { 3, 5, 6, 8 }, "Right Arm", 0);
+			break;
+		case 6:
+			initContext(&e->conts[6], { 0, 3}, "Neck", 0);
+			break;
+		case 7:
+			initContext(&e->conts[7], { 0, 1, 2, 3, 10, 11}, "Hips", 0);
+			break;
+		case 8:
+			initContext(&e->conts[8], { 5 }, "Right Hand", 0);
+			break;
+		case 9:
+			initContext(&e->conts[9], { 4 }, "Left Hand", 0);
+			break;
+		case 10:
+			initContext(&e->conts[10], { 1 }, "Right Foot", 0);
+			break;
+		case 11:
+			initContext(&e->conts[11], { 2 }, "Left Foot", 0);
+			break;
+		case 12:
+			initContext(&e->conts[12], { 0, 1, 2, 3, 4, 5, 6, 7, 10, 11 }, "Move Away", 0);
+			break;
+		case 13:
+			initContext(&e->conts[13], { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 }, "Move Behind", 0);
+			break;
+		case 14:
+			initContext(&e->conts[14], { 0, 1, 2, 7, 10, 11 }, "Move On Top", 0);
 			break;
 		}
 	}
 }
 
-
-
 //https://github.com/wmcbrine/PDCurses/blob/master/docs/MANUAL.md
 //https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/
-//Add all the context checking needed for combat
-//Add player body parts actions
+//Add context checking for when you want a movement, if your bodypart isn't in right position can't do that move
+//Add stat rolls for all the body movements, and attacking of enemy
+//This system should allow for actual moves, but lets see if it works
 //Add enemy AI
-//Add simple generation for matches, tournaments for dungeons? Can make decisons what to do between matches for basic role if good or bad effect happens from this
+//Add simple generation for matches, tournaments for dungeons? Can make decisons what to do between matches for basic roll if good or bad effect happens from this
 //Stat increases based off matches
 //Add practice throughout the week if time
 //If time do fancy coloring of tiles
 int main() {
+	srand(time(NULL));
 	initscr();
 	cbreak();
 	noecho();
 	keypad(stdscr, TRUE);
 	WINDOW* win = newwin(20, 20, 0, 0);
 	WINDOW* win2 = newwin(30, 56, 0, 20);
-	WINDOW* win3 = newwin(30, 40, 0, 68);
+	WINDOW* win3 = newwin(30, 50, 0, 68);
 	wborder(win, ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ');
 	wborder(win2, ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ');
 	wborder(win3, ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ');
@@ -148,18 +319,22 @@ int main() {
 	Entity player = { 10, 10, 250};
 	player.action = Actions::PUSH;
 	player.name = "Player";
+	
 	Entity enemy = { 20, 14, 230};
 	enemy.name = "Enemy";
 	enemy.target = &player;
 	enemy.btarget = &player.bodyparts[0];
 	enemy.atkpart = &enemy.bodyparts[8];
-	enemy.activepart = &enemy.bodyparts[5];
+	enemy.action = Actions::PUSH;
+
 	player.target = &enemy;
 	player.btarget = &enemy.bodyparts[0];
 	player.atkpart = &player.bodyparts[8];
-	player.activepart = &player.bodyparts[5];
 	initParts(&player);
 	initParts(&enemy);
+	initEntityContext(&player);
+	initEntityContext(&enemy);
+
 	Tile tiles[400];
 	initTiles(tiles);
 	int turnnum = 0;
@@ -229,13 +404,29 @@ int main() {
 				player.action = Actions::GRAB;
 				player.recent = "You grabbed " + player.btarget->name + " on " + player.target->name + " using " + player.atkpart->name;
 				player.atkpart->attached = player.btarget;
-				turnnum += 5;
+				player.atkpart->fatigue += 1;
+				turnnum += 2;
 				break;
 			case 3:
 				player.atkpart = &player.bodyparts[0];
 				break;
 			case 4:
-				
+				player.action = Actions::PUSH;
+				turnnum += 6;
+				if (player.atkpart->attached != NULL) {
+					player.recent = "You pushed " + player.atkpart->attached->name + " using " + player.atkpart->name;
+					player.atkpart->attached->spos = SpacePos::FORWARD;
+					player.atkpart->spos = SpacePos::FORWARD;
+					player.atkpart->face = Facing::UP;
+					player.atkpart->attached->face = Facing::UP;
+					player.atkpart->attached->health -= player.atkpart->power;
+					player.atkpart->attached->fatigue += 1;
+				}
+				else {
+					player.recent = "You pushed your " + player.atkpart->name + " forward";
+					player.atkpart->spos = SpacePos::FORWARD;
+					player.atkpart->face = Facing::UP;
+				}
 				break;
 			}
 			break;
@@ -254,13 +445,33 @@ int main() {
 				}
 				player.action = Actions::PUSH;
 				player.recent = "You pushed at " + player.btarget->name + " on " + player.target->name + " using " + player.atkpart->name;
+				player.atkpart->spos = SpacePos::FORWARD;
+				player.btarget->spos = SpacePos::BACK;
+				player.atkpart->face = Facing::UP;
+				player.btarget->health -= player.atkpart->power;
+				player.btarget->fatigue += 1;
 				turnnum += 6;
 				break;
 			case 3:
 				player.atkpart = &player.bodyparts[1];
 				break;
 			case 4:
-				
+				player.action = Actions::WRENCH;
+				turnnum += 4;
+				if (player.atkpart->attached != NULL) {
+					player.recent = "You wrenched " + player.atkpart->attached->name + " back using " + player.atkpart->name;
+					player.atkpart->attached->spos = SpacePos::BACK;
+					player.atkpart->spos = SpacePos::BACK;
+					player.atkpart->face = Facing::DOWN;
+					player.atkpart->attached->face = Facing::DOWN;
+					player.atkpart->attached->health -= player.atkpart->power;
+					player.atkpart->attached->fatigue += 2;
+				}
+				else {
+					player.recent = "You wrenched your " + player.atkpart->name + " back";
+					player.atkpart->spos = SpacePos::BACK;
+					player.atkpart->face = Facing::DOWN;
+				}
 				break;
 			}
 			break;
@@ -274,18 +485,35 @@ int main() {
 				break;
 			case 2:
 				if (player.atkpart->attached == NULL) {
-					player.recent = "You can't wrench " + player.atkpart->name + " unattached";
+					player.recent = "You can't release " + player.atkpart->name + " unattached";
 					break;
 				}
-				player.action = Actions::WRENCH;
-				player.recent = "You wrenched " + player.btarget->name + " back on " + player.target->name + " using " + player.atkpart->name;
-				turnnum += 4;
+				player.action = Actions::RELEASE;
+				player.recent = "You released " + player.btarget->name + " on " + player.target->name + " using " + player.atkpart->name;
+				player.atkpart->attached = NULL;
+				turnnum += 1;
 				break;
 			case 3:
 				player.atkpart = &player.bodyparts[2];
 				break;
 			case 4:
-				
+				player.action = Actions::LIFT;
+				turnnum += 4;
+				if (player.atkpart->attached != NULL) {
+					player.recent = "You lifted " + player.atkpart->attached->name + " using " + player.atkpart->name;
+					player.atkpart->attached->mpos = MatPos::INAIR;
+					player.atkpart->mpos = MatPos::INAIR;
+					player.atkpart->face = Facing::UP;
+					player.atkpart->attached->face = Facing::UP;
+					player.atkpart->attached->health -= player.atkpart->power;
+					player.atkpart->attached->fatigue += 4;
+					turnnum += 3;
+				}
+				else {
+					player.recent = "You lifted " + player.atkpart->name + " up";
+					player.atkpart->mpos = MatPos::INAIR;
+					player.atkpart->face = Facing::UP;
+				}
 				break;
 			}
 			break;
@@ -297,20 +525,24 @@ int main() {
 			case 1:
 				player.btarget = &player.target->bodyparts[3];
 				break;
-			case 2:
-				if (player.atkpart->attached == NULL) {
-					player.recent = "You can't lift " + player.atkpart->name + " unattached";
-					break;
-				}
-				player.action = Actions::LIFT;
-				player.recent = "You lifted " + player.btarget->name + " up on " + player.target->name + " using " + player.atkpart->name;
-				turnnum += 7;
-				break;
 			case 3:
 				player.atkpart = &player.bodyparts[3];
 				break;
 			case 4:
-				
+				player.action = Actions::PRESS;
+				turnnum += 2;
+				if (player.atkpart->attached != NULL) {
+					player.recent = "You pressed down " + player.atkpart->attached->name + " using " + player.atkpart->name;
+					player.atkpart->attached->mpos = MatPos::ONMAT;
+					player.atkpart->mpos = MatPos::ONMAT;
+					player.atkpart->attached->health -= player.atkpart->power;
+					player.atkpart->attached->fatigue += 3;
+				}
+				else {
+					player.recent = "You pressed down " + player.atkpart->name;
+					player.atkpart->mpos = MatPos::ONMAT;
+					player.atkpart->face = Facing::DOWN;
+				}
 				break;
 			}
 			break;
@@ -318,16 +550,6 @@ int main() {
 			switch (actionmode) {
 			case 1:
 				player.btarget = &player.target->bodyparts[4];
-				break;
-			case 2:
-				if (player.atkpart->attached == NULL) {
-					player.recent = "You can't release " + player.atkpart->name + " unattached";
-					break;
-				}
-				player.action = Actions::RELEASE;
-				player.recent = "You released " + player.btarget->name + " on " + player.target->name + " using " + player.atkpart->name;
-				player.atkpart->attached = NULL;
-				turnnum += 1;
 				break;
 			case 3:
 				player.atkpart = &player.bodyparts[4];
@@ -428,7 +650,27 @@ int main() {
 				break;
 			}
 			break;
+		case KEY_Q:
+			//Move away
+			//Roll to see if you can get away from enemy, this will release grabs enemy has on you
+			player.action = Actions::AWAY;
+			turnnum += 10;
+			break;
+		case KEY_W:
+			//Move Behind
+			//Roll to see if you can get by enemy
+			player.action = Actions::BEHIND;
+			turnnum += 10;
+			break;
+		case KEY_E:
+			//Move on Top
+			//Check if enemy is on mat
+			player.action = Actions::TOP;
+			turnnum += 10;
+			break;
 		}
+		updateBodyPartPos(&player);
+		updateBodyPartPos(&enemy);
 		wprintw(win2, "STATS\n");
 		wprintw(win2, "--------------------\n");
 		for (auto& i : player.bodyparts) {
@@ -437,38 +679,27 @@ int main() {
 					i.fatigue += 3;
 				}
 			}
+			else {
+				if (turnchanged) {
+					i.fatigue -= 2;
+				}
+			}
 			if (i.fatigue > 100) {
 				i.fatigue = 100;
 			}
-			std::string temp = i.name + "; Fatigue:" + std::to_string(i.fatigue) + "; Power:" + std::to_string(i.power);
-			wprintw(win2, temp.c_str());
-			if (temp.size() < 40) {
-				wprintw(win2, "\n");
+			else if (i.fatigue < 0) {
+				i.fatigue = 0;
 			}
+			std::string temp = i.name + " " + PosToString(i.mpos, i.spos) + "; Fatigue:" + std::to_string(i.fatigue) + "; Power:" + std::to_string(i.power) + "\n ";
+			wprintw(win2, temp.c_str());
 		}
 		wprintw(win2, "--------------------\n");
 		wprintw(win2, "SIGHT\n");
 		std::string temp3 = player.target->recent + "\n";
 		wprintw(win2, temp3.c_str());
-		wprintw(win2, "--------------------\n");
-		wprintw(win2, "BODY AWARENESS\n");
-		std::string temp = "Targeting: " + player.btarget->name + " on " + enemy.name + "\n";
-		wprintw(win2, temp.c_str());
-		std::string temp4 = "Using: " + player.atkpart->name + "\n";
-		wprintw(win2, temp4.c_str());
-		std::string temp2 = player.recent + "\n";
-		wprintw(win2, temp2.c_str());
-		wprintw(win2, "--------------------\n");
-		wprintw(win2, "TURN\n");
-		std::string temp5 = "Turn Max: " + std::to_string(turnmax) + "\n";
-		wprintw(win2, temp5.c_str());
-		std::string temp6 = "Current Turn: " + std::to_string(turnnum) + "\n";
-		wprintw(win2, temp6.c_str());
-		if (turnchanged) {
-			wprintw(win2, "Not your turn\n");
-		}
-		else {
-			wprintw(win2, "Your turn\n");
+		for (auto& i : enemy.bodyparts) {
+			std::string temp = i.name + " " + PosToString(i.mpos, i.spos) + "; Fatigue:" + std::to_string(i.fatigue) + "; Power:" + std::to_string(i.power) + "\n ";
+			wprintw(win2, temp.c_str());
 		}
 		wprintw(win2, "--------------------\n");
 		wprintw(win3, "ACTIONS\n");
@@ -513,9 +744,7 @@ int main() {
 			}
 			wprintw(win3, "1:Grab\n");
 			wprintw(win3, "2:Push\n");
-			wprintw(win3, "3:Wrench\n");
-			wprintw(win3, "4:Lift\n");
-			wprintw(win3, "5:Release\n");
+			wprintw(win3, "3:Release\n");
 			wprintw(win3, "Press escape to go back\n");
 			break;
 		case 3:
@@ -542,23 +771,46 @@ int main() {
 			break;
 		case 4:
 			if (player.atkpart->attached != NULL) {
-				std::string tem = "Can't move " + player.atkpart->name + " freely, attached to " + player.atkpart->attached->name + "\n";
+				std::string tem = "Can't move " + player.atkpart->name + " freely, attached to target " + player.atkpart->attached->name + "\n";
 				wprintw(win3, tem.c_str());
 			}
 			else {
 				std::string tem = player.atkpart->name + " unattached can move freely\n";
 				wprintw(win3, tem.c_str());
 			}
-			wprintw(win3, "1:Push\n");
-			wprintw(win3, "2:Wrench\n");
-			wprintw(win3, "3:Lift\n");
-			wprintw(win3, "4:Press\n");
+			wprintw(win3, "1:Push Forward\n");
+			wprintw(win3, "2:Wrench Backwards\n");
+			wprintw(win3, "3:Lift Up\n");
+			wprintw(win3, "4:Press Down\n");
 			wprintw(win3, "Press escape to go back\n");
 			break;
 		}
 		wprintw(win3, "--------------------\n");
-		wprintw(win3, "REACTIONS\n");
-		//Hit the key for defense against enemy moves, will do stat roll to see if you succeded
+		wprintw(win3, "COMPLEX MOVEMENTS\n");
+		wprintw(win3, "Q:Move Away\n");
+		wprintw(win3, "W:Move Behind\n");
+		wprintw(win3, "E:Move On Top\n");
+		wprintw(win3, "--------------------\n");
+		wprintw(win3, "BODY AWARENESS\n");
+		std::string temp = "Targeting: " + player.btarget->name + " on " + enemy.name + "\n";
+		wprintw(win3, temp.c_str());
+		std::string temp4 = "Using: " + player.atkpart->name + "\n";
+		wprintw(win3, temp4.c_str());
+		std::string temp2 = player.recent + "\n";
+		wprintw(win3, temp2.c_str());
+		wprintw(win3, "--------------------\n");
+		wprintw(win3, "TURN\n");
+		std::string temp5 = "Turn Max: " + std::to_string(turnmax) + "\n";
+		wprintw(win3, temp5.c_str());
+		std::string temp6 = "Current Turn: " + std::to_string(turnnum) + "\n";
+		wprintw(win3, temp6.c_str());
+		if (turnchanged) {
+			wprintw(win3, "Not your turn\n");
+		}
+		else {
+			wprintw(win3, "Your turn\n");
+		}
+		wprintw(win3, "--------------------\n");
 		wprintw(win2, keycode.c_str());
 
 		int j = 0;

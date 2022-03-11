@@ -30,7 +30,8 @@ enum class MatPos {ONMAT, INAIR, UNDEFINED};
 enum class SpacePos {FORWARD, BACK, UNDEFINED};
 //Up meaning the front of the body not facing the mat and down facing the mat
 enum class Facing {UP, DOWN, UNDEFINED};
-
+//Enemy ai personalities, maybe just use function pointers to update them
+enum class Personal {DEFENSIVE, AGGRESIVE, PATIENT, SCARED};
 
 
 struct Tile {
@@ -81,6 +82,7 @@ struct Entity {
 	std::string name;
 	Context conts[17];
 	Mcont mconts[12];
+	void (*update)(Entity* e);
 };
 
 
@@ -231,17 +233,17 @@ Facing reverseFace(Facing face) {
 }
 
 
-bool rollLimb(Part* atkpart, Part* epart, int atkpos, int epartpos) {
+int rollLimb(Part* atkpart, Part* epart) {
 	//Take fatigue as a modifer
 	//Take power as a modifier
 	//Take into account enemies fatigue and power
-	int roll = rand() % 100 - atkpart->fatigue + atkpart->power - atkpart->attached->power + atkpart->attached->fatigue;
-	if (roll > 50) {
-		return true;
-	}
-	return false;
+	int roll = rand() % 100 - atkpart->fatigue + atkpart->power - epart->power + epart->fatigue;
+	return roll;
 }
-
+int rollBasic() {
+	int roll = rand() % 100;
+	return roll;
+}
 
 
 //Implement context checking for shots(so can't grab leg unless leg ONMAT), do a seperate vector of contexts for limbs to check for a movement
@@ -531,9 +533,26 @@ void initMConts(Entity* e){
 }
 
 
+
+void generateEnemy(Entity* e, Entity *p) {
+	e->x = 20;
+	e->y = 14;
+	e->tile = 230;
+	e->name = "Enemy";
+	e->target = p;
+	e->btarget = &p->bodyparts[0];
+	e->atkpart = &e->bodyparts[8];
+	e->action = Actions::PUSH;
+	initParts(e);
+	initEntityContext(e);
+	initMConts(e);
+	//Put AI generation here
+}
+
+
+
 //https://github.com/wmcbrine/PDCurses/blob/master/docs/MANUAL.md
 //https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/
-//Add stat rolls for all the body movements, and attacking of enemy
 //Add enemy AI, use a state machine based on enemy's personality(enum)
 //Add simple generation for matches, tournaments for dungeons? Can make decisons what to do between matches for basic roll if good or bad effect happens from this
 //Stat increases based off matches
@@ -582,6 +601,8 @@ int main() {
 	bool playerturn = true;
 	bool turnchanged = false;
 	int actionmode = 0;
+	int ebturns = 0;
+	int pbturns = 0;
 	while (!exitf) {
 		wclear(win2);
 		wclear(win3);
@@ -642,6 +663,10 @@ int main() {
 					break;
 				}
 				player.action = Actions::GRAB;
+				if (rollLimb(player.atkpart, player.btarget) < 20) {
+					player.recent = "Failed to grab " + player.btarget->name;
+					break;
+				}
 				if (!checkMoveCont(&player, player.atkpart)) {
 					break;
 				}
@@ -670,6 +695,10 @@ int main() {
 					break;
 				}
 				player.action = Actions::PUSH;
+				if (rollLimb(player.atkpart, player.btarget) < 40) {
+					player.recent = "Failed to push " + player.btarget->name;
+					break;
+				}
 				if (!checkMoveCont(&player, player.atkpart)) {
 					break;
 				}
@@ -730,6 +759,10 @@ int main() {
 				}
 				turnnum += 6;
 				if (player.atkpart->attached != NULL) {
+					if (rollLimb(player.atkpart, player.btarget) < 50) {
+						player.recent = "Failed to push attached " + player.atkpart->attached->name;
+						break;
+					}
 					player.recent = "You pushed " + player.atkpart->attached->name + " using " + player.atkpart->name;
 					player.atkpart->attached->spos = SpacePos::FORWARD;
 					player.atkpart->spos = SpacePos::FORWARD;
@@ -763,6 +796,10 @@ int main() {
 				}
 				turnnum += 4;
 				if (player.atkpart->attached != NULL) {
+					if (rollLimb(player.atkpart, player.btarget) < 50) {
+						player.recent = "Failed to wrench attached " + player.atkpart->attached->name;
+						break;
+					}
 					player.recent = "You wrenched " + player.atkpart->attached->name + " back using " + player.atkpart->name;
 					player.atkpart->attached->spos = SpacePos::BACK;
 					player.atkpart->spos = SpacePos::BACK;
@@ -796,6 +833,10 @@ int main() {
 				}
 				turnnum += 4;
 				if (player.atkpart->attached != NULL) {
+					if (rollLimb(player.atkpart, player.btarget) < 55) {
+						player.recent = "Failed to lift attached " + player.atkpart->attached->name;
+						break;
+					}
 					player.recent = "You lifted " + player.atkpart->attached->name + " using " + player.atkpart->name;
 					player.atkpart->attached->mpos = MatPos::INAIR;
 					player.atkpart->mpos = MatPos::INAIR;
@@ -830,6 +871,10 @@ int main() {
 				}
 				turnnum += 2;
 				if (player.atkpart->attached != NULL) {
+					if (rollLimb(player.atkpart, player.btarget) < 40) {
+						player.recent = "Failed to press down attached " + player.atkpart->attached->name;
+						break;
+					}
 					player.recent = "You pressed down " + player.atkpart->attached->name + " using " + player.atkpart->name;
 					player.atkpart->attached->mpos = MatPos::ONMAT;
 					player.atkpart->mpos = MatPos::ONMAT;
@@ -859,6 +904,10 @@ int main() {
 					break;
 				}
 				if (player.atkpart->attached != NULL) {
+					if (rollLimb(player.atkpart, player.btarget) < 60) {
+						player.recent = "Failed to twist attached " + player.atkpart->attached->name;
+						break;
+					}
 					player.atkpart->attached->face = reverseFace(player.atkpart->attached->face);
 					player.atkpart->face = reverseFace(player.atkpart->face);
 					player.recent = "You twisted " + player.atkpart->attached->name + " " + FacePosToString(player.atkpart->attached->face) + " using " + player.atkpart->name;
@@ -1088,6 +1137,22 @@ int main() {
 		wrefresh(win2);
 		wrefresh(win3);
 		if (turnchanged) {
+			if (player.target->bodyparts[3].mpos == MatPos::ONMAT && player.target->bodyparts[3].face == Facing::DOWN) {
+				ebturns++;
+			}
+			if (player.bodyparts[3].mpos == MatPos::ONMAT && player.bodyparts[3].face == Facing::DOWN) {
+				pbturns++;
+			}
+			if (ebturns >= 3) {
+				enemy.recent = "You pinned your enemy!";
+				ebturns = 0;
+				//Insert call to tournament handler
+			}
+			if (pbturns >= 3) {
+				enemy.recent = "You got pinned!?";
+				pbturns = 0;
+				//Insert call to death here
+			}
 			//Put enemy AI here
 			turnchanged = false;
 			turnnum = 0;

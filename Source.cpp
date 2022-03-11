@@ -25,6 +25,7 @@ bool exitf = false;
 
 //Own body parts: Push, forward; Wrench, move back; Lift, move up; Press, move down;
 enum class Actions {GRAB, PUSH, WRENCH, LIFT, RELEASE, PRESS, AWAY, BEHIND, TOP};
+//Add a position above inair 
 enum class MatPos {ONMAT, INAIR, UNDEFINED};
 enum class SpacePos {FORWARD, BACK, UNDEFINED};
 //Up meaning the front of the body not facing the mat and down facing the mat
@@ -52,19 +53,21 @@ struct Part {
 	Facing face;
 	std::string name;
 	Part* attached;
+	int n;
 };
-struct ActionPos {
+struct ActionContext {
 	Actions action;
 	std::vector<MatPos> mpos;
 	std::vector<SpacePos> spos;
 	std::vector<Facing> face;
 	std::vector<int> pos;
 };
-
-struct MoveContext {
-	Part* mpart;
-	std::vector<ActionPos> act;
+struct Mcont {
+	Part* part;
+	int n;
+	std::vector<ActionContext> acs;
 };
+
 struct Entity {
 	int x;
 	int y;
@@ -77,7 +80,7 @@ struct Entity {
 	std::string recent;
 	std::string name;
 	Context conts[17];
-	MoveContext movconts[12];
+	Mcont mconts[12];
 };
 
 
@@ -111,6 +114,7 @@ void initParts(Entity* e) {
 		e->bodyparts[i].mpos = MatPos::INAIR;
 		e->bodyparts[i].spos = SpacePos::BACK;
 		e->bodyparts[i].face = Facing::UP;
+		e->bodyparts[i].n = i;
 		switch (i) {
 		case 0:
 			e->bodyparts[i].name = "Core";
@@ -176,6 +180,46 @@ std::string PosToString(MatPos mpos, SpacePos spos) {
 	}
 	return temp + temp2;
 }
+std::string MatPosToString(MatPos m) {
+	switch (m) {
+	case MatPos::INAIR:
+		return "In Air";
+		break;
+	case MatPos::ONMAT:
+		return "On Mat";
+		break;
+	case MatPos::UNDEFINED:
+		return "UNDEFINED";
+		break;
+	}
+}
+std::string SpacePosToString(SpacePos m) { 
+	switch (m) {
+	case SpacePos::BACK:
+		return "Back";
+		break;
+	case SpacePos::FORWARD:
+		return "Forward";
+		break;
+	case SpacePos::UNDEFINED:
+		return "UNDEFINED";
+		break;
+	}
+}
+std::string FacePosToString(Facing m) {
+	switch (m) {
+	case Facing::DOWN:
+		return "Down";
+		break;
+	case Facing::UP:
+		return "Up";
+		break;
+	case Facing::UNDEFINED:
+		return "UNDEFINED";
+		break;
+	}
+}
+
 bool rollLimb(Part* atkpart, Part* epart, int atkpos, int epartpos) {
 	//Take fatigue as a modifer
 	//Take power as a modifier
@@ -190,13 +234,11 @@ bool rollLimb(Part* atkpart, Part* epart, int atkpos, int epartpos) {
 
 
 //Implement context checking for shots(so can't grab leg unless leg ONMAT), do a seperate vector of contexts for limbs to check for a movement
-void updateBodyPartPos(Entity *e) {
-	for (int i = 0; i < 12; i++) {
-		for (auto& k : e->conts[i].pos) {
-			e->bodyparts[k].mpos = e->bodyparts[i].mpos;
-			e->bodyparts[k].spos = e->bodyparts[i].spos;
-			e->bodyparts[k].face = e->bodyparts[i].face;
-		}
+void updateBodyPartPos(Entity *e, Part* part) {
+	for (auto& k : e->conts[part->n].pos) {
+		e->bodyparts[k].mpos = e->bodyparts[part->n].mpos;
+		e->bodyparts[k].spos = e->bodyparts[part->n].spos;
+		e->bodyparts[k].face = e->bodyparts[part->n].face;
 	}
 	//Need to put rolls here too
 	int contpos = 12;
@@ -259,34 +301,34 @@ void initEntityContext(Entity* e) {
 	for (int i = 0; i < 15; i++) {
 		switch (i) {
 		case 0:
-			initContext(&e->conts[0], { 0, 1, 2, 7, 8, 9, 10, 11 }, "Core", 0);
+			initContext(&e->conts[0], { 0, 1, 2, 7, 10, 11}, "Core", 0);
 			break;
 		case 1:
-			initContext(&e->conts[1], { 0, 3, 7, 10 }, "Right Leg", 0);
+			initContext(&e->conts[1], { 1, 10 }, "Right Leg", 0);
 			break;
 		case 2:
-			initContext(&e->conts[2], { 0, 3, 7, 11 }, "Left Leg", 0);
+			initContext(&e->conts[2], { 2, 11 }, "Left Leg", 0);
 			break;
 		case 3:
 			initContext(&e->conts[3], { 0, 3, 7}, "Back", 0);
 			break;
 		case 4:
-			initContext(&e->conts[4], { 3, 4, 6, 9 }, "Left Arm", 0);
+			initContext(&e->conts[4], { 4, 9 }, "Left Arm", 0);
 			break;
 		case 5:
-			initContext(&e->conts[5], { 3, 5, 6, 8 }, "Right Arm", 0);
+			initContext(&e->conts[5], { 8 }, "Right Arm", 0);
 			break;
 		case 6:
-			initContext(&e->conts[6], { 0, 3}, "Neck", 0);
+			initContext(&e->conts[6], {0, 3, 6 }, "Neck", 0);
 			break;
 		case 7:
-			initContext(&e->conts[7], { 0, 1, 2, 3, 10, 11}, "Hips", 0);
+			initContext(&e->conts[7], { 0, 1, 2, 3, 7, 10, 11}, "Hips", 0);
 			break;
 		case 8:
-			initContext(&e->conts[8], { 5 }, "Right Hand", 0);
+			initContext(&e->conts[8], { 5, 8 }, "Right Hand", 0);
 			break;
 		case 9:
-			initContext(&e->conts[9], { 4 }, "Left Hand", 0);
+			initContext(&e->conts[9], { 4, 9 }, "Left Hand", 0);
 			break;
 		case 10:
 			initContext(&e->conts[10], { 1 }, "Right Foot", 0);
@@ -307,525 +349,300 @@ void initEntityContext(Entity* e) {
 	}
 }
 //Keep all the vectors even
-void initActionCont(std::vector<ActionPos>& acts, int num){
-	ActionPos ac;
-	switch (num) {
-	case 0:
-		ac.action = Actions::PUSH;
-		ac.pos = {10, 11};
-		ac.mpos = {MatPos::INAIR, MatPos::INAIR};
-		ac.spos = {SpacePos::UNDEFINED, SpacePos::UNDEFINED};
-		ac.face = {Facing::UNDEFINED, Facing::UNDEFINED};
-		acts.push_back(ac);
-		ac.action = Actions::WRENCH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::LIFT;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PRESS;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		break;
-	case 1:
-		ac.action = Actions::GRAB;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PUSH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::WRENCH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::LIFT;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PRESS;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::RELEASE;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		break;
-	case 2:
-		ac.action = Actions::GRAB;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PUSH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::WRENCH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::LIFT;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PRESS;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::RELEASE;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		break;
-	case 3:
-		ac.action = Actions::GRAB;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PUSH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::WRENCH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::LIFT;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PRESS;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::RELEASE;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		break;
-	case 4:
-		ac.action = Actions::GRAB;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PUSH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::WRENCH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::LIFT;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PRESS;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::RELEASE;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		break;
-	case 5:
-		ac.action = Actions::GRAB;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PUSH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::WRENCH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::LIFT;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PRESS;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::RELEASE;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		break;
-	case 6:
-		ac.action = Actions::GRAB;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PUSH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::WRENCH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::LIFT;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PRESS;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::RELEASE;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		break;
-	case 7:
-		ac.action = Actions::GRAB;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PUSH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::WRENCH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::LIFT;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PRESS;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::RELEASE;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		break;
-	case 8:
-		ac.action = Actions::GRAB;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PUSH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::WRENCH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::LIFT;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PRESS;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::RELEASE;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		break;
-	case 9:
-		ac.action = Actions::GRAB;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PUSH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::WRENCH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::LIFT;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PRESS;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::RELEASE;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		break;
-	case 10:
-		ac.action = Actions::GRAB;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PUSH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::WRENCH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::LIFT;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PRESS;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::RELEASE;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		break;
-	case 11:
-		ac.action = Actions::GRAB;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PUSH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::WRENCH;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::LIFT;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::PRESS;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		ac.action = Actions::RELEASE;
-		ac.pos = {};
-		ac.mpos = {};
-		ac.spos = {};
-		ac.face = {};
-		acts.push_back(ac);
-		break;
-	}
+//Rewrite this entire thing to be based around moving parts if they aren't in the right position so another part can move
+void initActionCont(std::vector<ActionContext>& acs, int n){
+	ActionContext ac;
+		switch (n) {
+		case 0:
+			ac.action = Actions::PUSH;
+			ac.pos = { 10, 11 };
+			ac.mpos = { MatPos::INAIR, MatPos::INAIR };
+			ac.spos = { SpacePos::UNDEFINED, SpacePos::UNDEFINED };
+			ac.face = { Facing::UNDEFINED, Facing::UNDEFINED };
+			acs.push_back(ac);
+			ac.action = Actions::WRENCH;
+			ac.pos = { 0, 3, 7 };
+			ac.mpos = { MatPos::UNDEFINED, MatPos::UNDEFINED, MatPos::UNDEFINED };
+			ac.spos = { SpacePos::BACK, SpacePos::BACK, SpacePos::BACK };
+			ac.face = { Facing::UNDEFINED, Facing::UNDEFINED, Facing::UNDEFINED };
+			acs.push_back(ac);
+			ac.action = Actions::LIFT;
+			ac.pos = { 0, 7, 10, 11 };
+			ac.mpos = { MatPos::INAIR, MatPos::UNDEFINED, MatPos::INAIR, MatPos::INAIR };
+			ac.spos = { SpacePos::UNDEFINED, SpacePos::UNDEFINED, SpacePos::UNDEFINED, SpacePos::UNDEFINED };
+			ac.face = { Facing::UNDEFINED, Facing::UP, Facing::UNDEFINED, Facing::UNDEFINED };
+			acs.push_back(ac);
+			ac.action = Actions::PRESS;
+			ac.pos = { 0, 7 };
+			ac.mpos = { MatPos::ONMAT, MatPos::ONMAT };
+			ac.spos = { SpacePos::UNDEFINED, SpacePos::BACK };
+			ac.face = { Facing::DOWN, Facing::UNDEFINED };
+			acs.push_back(ac);
+			break;
+		case 1:
+			ac.action = Actions::GRAB;
+			ac.pos = {0, 7};
+			ac.mpos = {MatPos::UNDEFINED, MatPos::UNDEFINED};
+			ac.spos = {SpacePos::BACK, SpacePos::BACK};
+			ac.face = {Facing::UNDEFINED, Facing::UNDEFINED};
+			acs.push_back(ac);
+			break;
+		case 2:
+			ac.action = Actions::GRAB;
+			ac.pos = { 0, 7 };
+			ac.mpos = { MatPos::UNDEFINED, MatPos::UNDEFINED };
+			ac.spos = { SpacePos::BACK, SpacePos::BACK };
+			ac.face = { Facing::UNDEFINED, Facing::UNDEFINED };
+			acs.push_back(ac);
+			break;
+		case 3:
+			ac.action = Actions::LIFT;
+			ac.pos = {7};
+			ac.mpos = {MatPos::INAIR};
+			ac.spos = {SpacePos::UNDEFINED};
+			ac.face = {Facing::UNDEFINED};
+			acs.push_back(ac);
+			ac.action = Actions::PRESS;
+			ac.pos = {7};
+			ac.mpos = { MatPos::INAIR };
+			ac.spos = { SpacePos::UNDEFINED };
+			ac.face = { Facing::UNDEFINED };
+			acs.push_back(ac);
+			break;
+		case 4:
+			ac.action = Actions::GRAB;
+			ac.pos = {2, 6};
+			ac.mpos = {MatPos::UNDEFINED, MatPos::UNDEFINED};
+			ac.spos = {SpacePos::BACK, SpacePos::BACK};
+			ac.face = {Facing::UNDEFINED, Facing::UNDEFINED};
+			acs.push_back(ac);
+			break;
+		case 5:
+			ac.action = Actions::GRAB;
+			ac.pos = { 1, 6 };
+			ac.mpos = { MatPos::UNDEFINED, MatPos::UNDEFINED };
+			ac.spos = { SpacePos::BACK, SpacePos::BACK };
+			ac.face = { Facing::UNDEFINED, Facing::UNDEFINED };
+			acs.push_back(ac);
+			break;
+		case 6:
+			ac.action = Actions::GRAB;
+			ac.pos = {6, 7};
+			ac.mpos = {MatPos::UNDEFINED, MatPos::UNDEFINED};
+			ac.spos = {SpacePos::BACK, SpacePos::BACK};
+			ac.face = {Facing::UNDEFINED, Facing::UNDEFINED};
+			acs.push_back(ac);
+			break;
+		case 7:
+			ac.action = Actions::LIFT;
+			ac.pos = {10, 11};
+			ac.mpos = {MatPos::ONMAT, MatPos::ONMAT};
+			ac.spos = {SpacePos::UNDEFINED, SpacePos::UNDEFINED};
+			ac.face = {Facing::UNDEFINED, Facing::UNDEFINED};
+			acs.push_back(ac);
+			ac.action = Actions::PRESS;
+			ac.pos = {1, 2};
+			ac.mpos = {MatPos::ONMAT, MatPos::ONMAT};
+			ac.spos = {SpacePos::UNDEFINED, SpacePos::UNDEFINED};
+			ac.face = {Facing::UNDEFINED, Facing::UNDEFINED};
+			acs.push_back(ac);
+			break;
+		case 8:
+			ac.action = Actions::GRAB;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::PUSH;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::LIFT;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::PRESS;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::RELEASE;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			break;
+		case 9:
+			ac.action = Actions::GRAB;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::PUSH;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::WRENCH;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::LIFT;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::PRESS;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::RELEASE;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			break;
+		case 10:
+			ac.action = Actions::GRAB;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::PUSH;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::WRENCH;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::LIFT;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::PRESS;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::RELEASE;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			break;
+		case 11:
+			ac.action = Actions::GRAB;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::PUSH;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::WRENCH;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::LIFT;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::PRESS;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			ac.action = Actions::RELEASE;
+			ac.pos = {};
+			ac.mpos = {};
+			ac.spos = {};
+			ac.face = {};
+			acs.push_back(ac);
+			break;
+		}
 }
-
-void initMoveConts(Entity* e){
-	for (int i = 0; i < 12; i++) {
-		MoveContext m;
-		m.mpart = &e->bodyparts[i];
-		initActionCont(m.act, i);
-	}
-}
-//Put this when a move is done by player to catch if movement is allowed
+//Get this to work fuckkkkkkkkkk
 bool checkMoveCont(Entity* e, Part* part) {
-	for (auto& i : e->movconts) {
-		if (i.mpart == part) {
-			for (auto& j : i.act) {
-				if (j.action == e->action) {
-					int m = 0;
-					for (auto& k : j.pos) {
-						if (e->bodyparts[k].mpos == j.mpos[m]) {
-							//Put recent response here to tell player why you couldn't move that way
-							if (j.mpos[m] == MatPos::INAIR) {
-								e->recent = "You can't move " + part->name + " because " + e->bodyparts[k].name + " is in the air";
-								//e->bodyparts[k].mpos = MatPos::ONMAT;
-							}
-							else {
-								e->recent = "You can't move " + part->name + " because " + e->bodyparts[k].name + " on the mat";
-								//e->bodyparts[k].mpos = MatPos::INAIR;
-							}
+	for (auto& i : e->mconts[part->n].acs) {
+		if (i.action == e->action) {
+			e->recent = "action found";
+			for (int j = 0; j < i.pos.size(); j++) {
+				for (auto& k : e->bodyparts) {
+					if (k.n == i.pos[j]) {
+						if (k.mpos == i.mpos[j]) {
+							e->recent = "Can't do action " + k.name + " is " + MatPosToString(k.mpos);
 							return false;
 						}
-						else if (e->bodyparts[k].spos == j.spos[m]) {
-							if (j.spos[m] == SpacePos::BACK) {
-								e->recent = "You can't move " + part->name + " because " + e->bodyparts[k].name + " is back";
-								//e->bodyparts[k].spos = SpacePos::FORWARD;
-							}
-							else {
-								e->recent = "You can't move " + part->name + " because " + e->bodyparts[k].name + " is forward";
-								//e->bodyparts[k].spos = SpacePos::BACK;
-							}
+						else if (k.spos == i.spos[j]) {
+							e->recent = "Can't do action " + k.name + " is " + SpacePosToString(k.spos);
 							return false;
 						}
-						else if (e->bodyparts[k].face == j.face[m]) {
-							if (j.face[m] == Facing::DOWN) {
-								e->recent = "You can't move " + part->name + " because " + e->bodyparts[k].name + " is facing down";
-								//e->bodyparts[k].face = Facing::UP;
-							}
-							else {
-								e->recent = "You can't move " + part->name + " because " + e->bodyparts[k].name + " is facing up";
-								//e->bodyparts[k].face = Facing::DOWN;
-							}
+						else if (k.face == i.face[j]) {
+							e->recent = "Can't do action " + k.name + " is facing" + FacePosToString(k.face);
 							return false;
 						}
-						m++;
-						/*
-						if (e->bodyparts[k].attached != NULL) {
-							return false;
-						}*/
 					}
 				}
 			}
+			e->recent = "No out of place limbs found";
+			return true;
 		}
 	}
+	e->recent = "Action not found";
 	return true;
 }
+void initMConts(Entity* e){
+	for (int i = 0; i < 12; i++) {
+		e->mconts[i].n = i;
+		e->mconts[i].part = &e->bodyparts[i];
+		initActionCont(e->mconts[i].acs, i);
+	}
+}
+
 
 //https://github.com/wmcbrine/PDCurses/blob/master/docs/MANUAL.md
 //https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/
 //Add context checking for when you want a movement, if your bodypart isn't in right position can't do that move
+//Maybe change old context system to move other limbs depending on actions and limb targeted, will be simpler
 // -Add all the rest of this
 //Add stat rolls for all the body movements, and attacking of enemy
+//Rearrange ui to be more fluid in attacking
 //This system should allow for actual moves, but lets see if it works
-//Add enemy AI
+//Add enemy AI, use a state machine based on enemy's personality(enum)
 //Add simple generation for matches, tournaments for dungeons? Can make decisons what to do between matches for basic roll if good or bad effect happens from this
 //Stat increases based off matches
 //Add practice throughout the week if time
@@ -863,8 +680,8 @@ int main() {
 	initParts(&enemy);
 	initEntityContext(&player);
 	initEntityContext(&enemy);
-	initMoveConts(&player);
-	initMoveConts(&player);
+	initMConts(&player);
+	initMConts(&enemy);
 
 	Tile tiles[400];
 	initTiles(tiles);
@@ -936,6 +753,7 @@ int main() {
 				if (!checkMoveCont(&player, player.atkpart)) {
 					break;
 				}
+				updateBodyPartPos(&player, player.atkpart);
 				player.recent = "You grabbed " + player.btarget->name + " on " + player.target->name + " using " + player.atkpart->name;
 				player.atkpart->attached = player.btarget;
 				player.atkpart->fatigue += 1;
@@ -964,13 +782,14 @@ int main() {
 					player.atkpart->spos = SpacePos::FORWARD;
 					player.atkpart->face = Facing::UP;
 				}
+				updateBodyPartPos(&player, player.atkpart);
 				break;
 			}
 			break;
 		case KEY_2:
 			switch (actionmode) {
 			case 0:
-				actionmode = 2;
+				actionmode = 3;
 				break;
 			case 1:
 				player.btarget = &player.target->bodyparts[1];
@@ -991,6 +810,7 @@ int main() {
 				player.btarget->health -= player.atkpart->power;
 				player.btarget->fatigue += 1;
 				turnnum += 6;
+				updateBodyPartPos(&player, player.atkpart);
 				break;
 			case 3:
 				player.atkpart = &player.bodyparts[1];
@@ -1015,13 +835,14 @@ int main() {
 					player.atkpart->spos = SpacePos::BACK;
 					player.atkpart->face = Facing::DOWN;
 				}
+				updateBodyPartPos(&player, player.atkpart);
 				break;
 			}
 			break;
 		case KEY_3:
 			switch (actionmode) {
 			case 0:
-				actionmode = 3;
+				actionmode = 2;
 				break;
 			case 1:
 				player.btarget = &player.target->bodyparts[2];
@@ -1038,6 +859,7 @@ int main() {
 				player.recent = "You released " + player.btarget->name + " on " + player.target->name + " using " + player.atkpart->name;
 				player.atkpart->attached = NULL;
 				turnnum += 1;
+				updateBodyPartPos(&player, player.atkpart);
 				break;
 			case 3:
 				player.atkpart = &player.bodyparts[2];
@@ -1063,6 +885,7 @@ int main() {
 					player.atkpart->mpos = MatPos::INAIR;
 					player.atkpart->face = Facing::UP;
 				}
+				updateBodyPartPos(&player, player.atkpart);
 				break;
 			}
 			break;
@@ -1073,6 +896,28 @@ int main() {
 				break;
 			case 1:
 				player.btarget = &player.target->bodyparts[3];
+				break;
+			case 2:
+				player.action = Actions::PUSH;
+				if (!checkMoveCont(&player, player.atkpart)) {
+					break;
+				}
+				turnnum += 6;
+				if (player.atkpart->attached != NULL) {
+					player.recent = "You pushed " + player.atkpart->attached->name + " using " + player.atkpart->name;
+					player.atkpart->attached->spos = SpacePos::FORWARD;
+					player.atkpart->spos = SpacePos::FORWARD;
+					player.atkpart->face = Facing::UP;
+					player.atkpart->attached->face = Facing::UP;
+					player.atkpart->attached->health -= player.atkpart->power;
+					player.atkpart->attached->fatigue += 1;
+				}
+				else {
+					player.recent = "You pushed your " + player.atkpart->name + " forward";
+					player.atkpart->spos = SpacePos::FORWARD;
+					player.atkpart->face = Facing::UP;
+				}
+				updateBodyPartPos(&player, player.atkpart);
 				break;
 			case 3:
 				player.atkpart = &player.bodyparts[3];
@@ -1095,6 +940,7 @@ int main() {
 					player.atkpart->mpos = MatPos::ONMAT;
 					player.atkpart->face = Facing::DOWN;
 				}
+				updateBodyPartPos(&player, player.atkpart);
 				break;
 			}
 			break;
@@ -1102,6 +948,28 @@ int main() {
 			switch (actionmode) {
 			case 1:
 				player.btarget = &player.target->bodyparts[4];
+				break;
+			case 2:
+				player.action = Actions::WRENCH;
+				if (!checkMoveCont(&player, player.atkpart)) {
+					break;
+				}
+				turnnum += 4;
+				if (player.atkpart->attached != NULL) {
+					player.recent = "You wrenched " + player.atkpart->attached->name + " back using " + player.atkpart->name;
+					player.atkpart->attached->spos = SpacePos::BACK;
+					player.atkpart->spos = SpacePos::BACK;
+					player.atkpart->face = Facing::DOWN;
+					player.atkpart->attached->face = Facing::DOWN;
+					player.atkpart->attached->health -= player.atkpart->power;
+					player.atkpart->attached->fatigue += 2;
+				}
+				else {
+					player.recent = "You wrenched your " + player.atkpart->name + " back";
+					player.atkpart->spos = SpacePos::BACK;
+					player.atkpart->face = Facing::DOWN;
+				}
+				updateBodyPartPos(&player, player.atkpart);
 				break;
 			case 3:
 				player.atkpart = &player.bodyparts[4];
@@ -1116,6 +984,29 @@ int main() {
 			case 1:
 				player.btarget = &player.target->bodyparts[5];
 				break;
+			case 2:
+				player.action = Actions::LIFT;
+				if (!checkMoveCont(&player, player.atkpart)) {
+					break;
+				}
+				turnnum += 4;
+				if (player.atkpart->attached != NULL) {
+					player.recent = "You lifted " + player.atkpart->attached->name + " using " + player.atkpart->name;
+					player.atkpart->attached->mpos = MatPos::INAIR;
+					player.atkpart->mpos = MatPos::INAIR;
+					player.atkpart->face = Facing::UP;
+					player.atkpart->attached->face = Facing::UP;
+					player.atkpart->attached->health -= player.atkpart->power;
+					player.atkpart->attached->fatigue += 4;
+					turnnum += 3;
+				}
+				else {
+					player.recent = "You lifted " + player.atkpart->name + " up";
+					player.atkpart->mpos = MatPos::INAIR;
+					player.atkpart->face = Facing::UP;
+				}
+				updateBodyPartPos(&player, player.atkpart);
+				break;
 			case 3:
 				player.atkpart = &player.bodyparts[5];
 				break;
@@ -1128,6 +1019,26 @@ int main() {
 			switch (actionmode) {
 			case 1:
 				player.btarget = &player.target->bodyparts[6];
+				break;
+			case 2:
+				player.action = Actions::PRESS;
+				if (!checkMoveCont(&player, player.atkpart)) {
+					break;
+				}
+				turnnum += 2;
+				if (player.atkpart->attached != NULL) {
+					player.recent = "You pressed down " + player.atkpart->attached->name + " using " + player.atkpart->name;
+					player.atkpart->attached->mpos = MatPos::ONMAT;
+					player.atkpart->mpos = MatPos::ONMAT;
+					player.atkpart->attached->health -= player.atkpart->power;
+					player.atkpart->attached->fatigue += 3;
+				}
+				else {
+					player.recent = "You pressed down " + player.atkpart->name;
+					player.atkpart->mpos = MatPos::ONMAT;
+					player.atkpart->face = Facing::DOWN;
+				}
+				updateBodyPartPos(&player, player.atkpart);
 				break;
 			case 3:
 				player.atkpart = &player.bodyparts[6];
@@ -1221,8 +1132,7 @@ int main() {
 			turnnum += 10;
 			break;
 		}
-		updateBodyPartPos(&player);
-		updateBodyPartPos(&enemy);
+		//updateBodyPartPos(&enemy);
 		wprintw(win2, "STATS\n");
 		wprintw(win2, "--------------------\n");
 		for (auto& i : player.bodyparts) {
@@ -1259,8 +1169,8 @@ int main() {
 		switch (actionmode) {
 		case 0:
 			wprintw(win3, "1:Choose Body Target\n");
-			wprintw(win3, "2:Choose Action\n");
-			wprintw(win3, "3:Choose your Body Part to Use\n");
+			wprintw(win3, "2:Choose your Body Part to Use\n");
+			wprintw(win3, "3:Choose Action\n");
 			wprintw(win3, "4:Action for your Own Body\n");
 			break;
 		case 1:
@@ -1286,17 +1196,15 @@ int main() {
 			wprintw(win3, "Press escape to go back\n");
 			break;
 		case 2:
-			if(player.atkpart->attached != NULL){
-				std::string tem = "Selected part " + player.atkpart->name + " attached to " + player.atkpart->attached->name + "\n";
-				wprintw(win3, tem.c_str());
-			}
-			else {
-				std::string tem = "Selected part " + player.atkpart->name + " unattached\n";
-				wprintw(win3, tem.c_str());
-			}
+			wprintw(win3, "Attack Target Part\n");
 			wprintw(win3, "1:Grab\n");
 			wprintw(win3, "2:Push\n");
 			wprintw(win3, "3:Release\n");
+			wprintw(win3, "Move Your Own Parts\n");
+			wprintw(win3, "4:Push Forward\n");
+			wprintw(win3, "5:Wrench Backwards\n");
+			wprintw(win3, "6:Lift Up\n");
+			wprintw(win3, "7:Press Down\n");
 			wprintw(win3, "Press escape to go back\n");
 			break;
 		case 3:
@@ -1348,6 +1256,14 @@ int main() {
 		wprintw(win3, temp.c_str());
 		std::string temp4 = "Using: " + player.atkpart->name + "\n";
 		wprintw(win3, temp4.c_str());
+		if (player.atkpart->attached != NULL) {
+			std::string tem = "Selected part " + player.atkpart->name + " attached to " + player.atkpart->attached->name + "\n";
+			wprintw(win3, tem.c_str());
+		}
+		else {
+			std::string tem = "Selected part " + player.atkpart->name + " unattached\n";
+			wprintw(win3, tem.c_str());
+		}
 		std::string temp2 = player.recent + "\n";
 		wprintw(win3, temp2.c_str());
 		wprintw(win3, "--------------------\n");

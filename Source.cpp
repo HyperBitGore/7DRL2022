@@ -24,7 +24,7 @@
 bool exitf = false;
 
 //Own body parts: Push, forward; Wrench, move back; Lift, move up; Press, move down;
-enum class Actions {GRAB, PUSH, WRENCH, LIFT, RELEASE, PRESS, AWAY, BEHIND, TOP};
+enum class Actions {GRAB, PUSH, WRENCH, LIFT, RELEASE, PRESS, TWIST, AWAY, BEHIND, TOP};
 //Add a position above inair 
 enum class MatPos {ONMAT, INAIR, UNDEFINED};
 enum class SpacePos {FORWARD, BACK, UNDEFINED};
@@ -219,6 +219,17 @@ std::string FacePosToString(Facing m) {
 		break;
 	}
 }
+Facing reverseFace(Facing face) {
+	switch (face) {
+		case Facing::DOWN:
+			return Facing::UP;
+		break;
+		case Facing::UP:
+			return Facing::DOWN;
+			break;
+	}
+}
+
 
 bool rollLimb(Part* atkpart, Part* epart, int atkpos, int epartpos) {
 	//Take fatigue as a modifer
@@ -436,7 +447,7 @@ void initActionCont(std::vector<ActionContext>& acs, int n){
 		case 7:
 			ac.action = Actions::LIFT;
 			ac.pos = {10, 11};
-			ac.mpos = {MatPos::ONMAT, MatPos::ONMAT};
+			ac.mpos = {MatPos::INAIR, MatPos::INAIR};
 			ac.spos = {SpacePos::UNDEFINED, SpacePos::UNDEFINED};
 			ac.face = {Facing::UNDEFINED, Facing::UNDEFINED};
 			acs.push_back(ac);
@@ -449,148 +460,34 @@ void initActionCont(std::vector<ActionContext>& acs, int n){
 			break;
 		case 8:
 			ac.action = Actions::GRAB;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::PUSH;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::LIFT;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::PRESS;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::RELEASE;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
+			ac.pos = {5};
+			ac.mpos = {MatPos::UNDEFINED};
+			ac.spos = {SpacePos::BACK};
+			ac.face = {Facing::UNDEFINED};
 			acs.push_back(ac);
 			break;
 		case 9:
 			ac.action = Actions::GRAB;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::PUSH;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::WRENCH;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::LIFT;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::PRESS;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::RELEASE;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
+			ac.pos = { 4 };
+			ac.mpos = { MatPos::UNDEFINED };
+			ac.spos = { SpacePos::BACK };
+			ac.face = { Facing::UNDEFINED };
 			acs.push_back(ac);
 			break;
 		case 10:
 			ac.action = Actions::GRAB;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::PUSH;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::WRENCH;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::LIFT;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::PRESS;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::RELEASE;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
+			ac.pos = {1};
+			ac.mpos = {MatPos::UNDEFINED};
+			ac.spos = {SpacePos::BACK};
+			ac.face = {Facing::UNDEFINED};
 			acs.push_back(ac);
 			break;
 		case 11:
 			ac.action = Actions::GRAB;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::PUSH;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::WRENCH;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::LIFT;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::PRESS;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
-			acs.push_back(ac);
-			ac.action = Actions::RELEASE;
-			ac.pos = {};
-			ac.mpos = {};
-			ac.spos = {};
-			ac.face = {};
+			ac.pos = { 2 };
+			ac.mpos = { MatPos::UNDEFINED };
+			ac.spos = { SpacePos::BACK };
+			ac.face = { Facing::UNDEFINED };
 			acs.push_back(ac);
 			break;
 		}
@@ -636,12 +533,7 @@ void initMConts(Entity* e){
 
 //https://github.com/wmcbrine/PDCurses/blob/master/docs/MANUAL.md
 //https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/
-//Add context checking for when you want a movement, if your bodypart isn't in right position can't do that move
-//Maybe change old context system to move other limbs depending on actions and limb targeted, will be simpler
-// -Add all the rest of this
 //Add stat rolls for all the body movements, and attacking of enemy
-//Rearrange ui to be more fluid in attacking
-//This system should allow for actual moves, but lets see if it works
 //Add enemy AI, use a state machine based on enemy's personality(enum)
 //Add simple generation for matches, tournaments for dungeons? Can make decisons what to do between matches for basic roll if good or bad effect happens from this
 //Stat increases based off matches
@@ -655,7 +547,7 @@ int main() {
 	keypad(stdscr, TRUE);
 	WINDOW* win = newwin(20, 20, 0, 0);
 	WINDOW* win2 = newwin(30, 56, 0, 20);
-	WINDOW* win3 = newwin(30, 50, 0, 68);
+	WINDOW* win3 = newwin(30, 49, 0, 71);
 	wborder(win, ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ');
 	wborder(win2, ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ');
 	wborder(win3, ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ');
@@ -762,28 +654,6 @@ int main() {
 			case 3:
 				player.atkpart = &player.bodyparts[0];
 				break;
-			case 4:
-				player.action = Actions::PUSH;
-				if (!checkMoveCont(&player, player.atkpart)) {
-					break;
-				}
-				turnnum += 6;
-				if (player.atkpart->attached != NULL) {
-					player.recent = "You pushed " + player.atkpart->attached->name + " using " + player.atkpart->name;
-					player.atkpart->attached->spos = SpacePos::FORWARD;
-					player.atkpart->spos = SpacePos::FORWARD;
-					player.atkpart->face = Facing::UP;
-					player.atkpart->attached->face = Facing::UP;
-					player.atkpart->attached->health -= player.atkpart->power;
-					player.atkpart->attached->fatigue += 1;
-				}
-				else {
-					player.recent = "You pushed your " + player.atkpart->name + " forward";
-					player.atkpart->spos = SpacePos::FORWARD;
-					player.atkpart->face = Facing::UP;
-				}
-				updateBodyPartPos(&player, player.atkpart);
-				break;
 			}
 			break;
 		case KEY_2:
@@ -811,31 +681,10 @@ int main() {
 				player.btarget->fatigue += 1;
 				turnnum += 6;
 				updateBodyPartPos(&player, player.atkpart);
+				updateBodyPartPos(&enemy, player.btarget);
 				break;
 			case 3:
 				player.atkpart = &player.bodyparts[1];
-				break;
-			case 4:
-				player.action = Actions::WRENCH;
-				if (!checkMoveCont(&player, player.atkpart)) {
-					break;
-				}
-				turnnum += 4;
-				if (player.atkpart->attached != NULL) {
-					player.recent = "You wrenched " + player.atkpart->attached->name + " back using " + player.atkpart->name;
-					player.atkpart->attached->spos = SpacePos::BACK;
-					player.atkpart->spos = SpacePos::BACK;
-					player.atkpart->face = Facing::DOWN;
-					player.atkpart->attached->face = Facing::DOWN;
-					player.atkpart->attached->health -= player.atkpart->power;
-					player.atkpart->attached->fatigue += 2;
-				}
-				else {
-					player.recent = "You wrenched your " + player.atkpart->name + " back";
-					player.atkpart->spos = SpacePos::BACK;
-					player.atkpart->face = Facing::DOWN;
-				}
-				updateBodyPartPos(&player, player.atkpart);
 				break;
 			}
 			break;
@@ -864,35 +713,12 @@ int main() {
 			case 3:
 				player.atkpart = &player.bodyparts[2];
 				break;
-			case 4:
-				player.action = Actions::LIFT;
-				if (!checkMoveCont(&player, player.atkpart)) {
-					break;
-				}
-				turnnum += 4;
-				if (player.atkpart->attached != NULL) {
-					player.recent = "You lifted " + player.atkpart->attached->name + " using " + player.atkpart->name;
-					player.atkpart->attached->mpos = MatPos::INAIR;
-					player.atkpart->mpos = MatPos::INAIR;
-					player.atkpart->face = Facing::UP;
-					player.atkpart->attached->face = Facing::UP;
-					player.atkpart->attached->health -= player.atkpart->power;
-					player.atkpart->attached->fatigue += 4;
-					turnnum += 3;
-				}
-				else {
-					player.recent = "You lifted " + player.atkpart->name + " up";
-					player.atkpart->mpos = MatPos::INAIR;
-					player.atkpart->face = Facing::UP;
-				}
-				updateBodyPartPos(&player, player.atkpart);
-				break;
 			}
 			break;
 		case KEY_4:
 			switch (actionmode) {
 			case 0:
-				actionmode = 4;
+
 				break;
 			case 1:
 				player.btarget = &player.target->bodyparts[3];
@@ -911,6 +737,7 @@ int main() {
 					player.atkpart->attached->face = Facing::UP;
 					player.atkpart->attached->health -= player.atkpart->power;
 					player.atkpart->attached->fatigue += 1;
+					updateBodyPartPos(&enemy, player.atkpart->attached);
 				}
 				else {
 					player.recent = "You pushed your " + player.atkpart->name + " forward";
@@ -921,26 +748,6 @@ int main() {
 				break;
 			case 3:
 				player.atkpart = &player.bodyparts[3];
-				break;
-			case 4:
-				player.action = Actions::PRESS;
-				if (!checkMoveCont(&player, player.atkpart)) {
-					break;
-				}
-				turnnum += 2;
-				if (player.atkpart->attached != NULL) {
-					player.recent = "You pressed down " + player.atkpart->attached->name + " using " + player.atkpart->name;
-					player.atkpart->attached->mpos = MatPos::ONMAT;
-					player.atkpart->mpos = MatPos::ONMAT;
-					player.atkpart->attached->health -= player.atkpart->power;
-					player.atkpart->attached->fatigue += 3;
-				}
-				else {
-					player.recent = "You pressed down " + player.atkpart->name;
-					player.atkpart->mpos = MatPos::ONMAT;
-					player.atkpart->face = Facing::DOWN;
-				}
-				updateBodyPartPos(&player, player.atkpart);
 				break;
 			}
 			break;
@@ -963,6 +770,7 @@ int main() {
 					player.atkpart->attached->face = Facing::DOWN;
 					player.atkpart->attached->health -= player.atkpart->power;
 					player.atkpart->attached->fatigue += 2;
+					updateBodyPartPos(&enemy, player.atkpart->attached);
 				}
 				else {
 					player.recent = "You wrenched your " + player.atkpart->name + " back";
@@ -973,9 +781,6 @@ int main() {
 				break;
 			case 3:
 				player.atkpart = &player.bodyparts[4];
-				break;
-			case 4:
-				
 				break;
 			}
 			break;
@@ -999,6 +804,7 @@ int main() {
 					player.atkpart->attached->health -= player.atkpart->power;
 					player.atkpart->attached->fatigue += 4;
 					turnnum += 3;
+					updateBodyPartPos(&enemy, player.atkpart->attached);
 				}
 				else {
 					player.recent = "You lifted " + player.atkpart->name + " up";
@@ -1009,9 +815,6 @@ int main() {
 				break;
 			case 3:
 				player.atkpart = &player.bodyparts[5];
-				break;
-			case 4:
-				
 				break;
 			}
 			break;
@@ -1032,6 +835,7 @@ int main() {
 					player.atkpart->mpos = MatPos::ONMAT;
 					player.atkpart->attached->health -= player.atkpart->power;
 					player.atkpart->attached->fatigue += 3;
+					updateBodyPartPos(&enemy, player.atkpart->attached);
 				}
 				else {
 					player.recent = "You pressed down " + player.atkpart->name;
@@ -1043,21 +847,33 @@ int main() {
 			case 3:
 				player.atkpart = &player.bodyparts[6];
 				break;
-			case 4:
-				
-				break;
 			}
 			break;
 		case KEY_8:
 			switch (actionmode) {
 			case 1:
 				player.btarget = &player.target->bodyparts[7];
+			case 2:
+				player.action = Actions::TWIST;
+				if (!checkMoveCont(&player, player.atkpart)) {
+					break;
+				}
+				if (player.atkpart->attached != NULL) {
+					player.atkpart->attached->face = reverseFace(player.atkpart->attached->face);
+					player.atkpart->face = reverseFace(player.atkpart->face);
+					player.recent = "You twisted " + player.atkpart->attached->name + " " + FacePosToString(player.atkpart->attached->face) + " using " + player.atkpart->name;
+					player.atkpart->attached->health -= player.atkpart->power;
+					player.atkpart->attached->fatigue += 3;
+					updateBodyPartPos(&enemy, player.atkpart->attached);
+				}
+				else {
+					player.atkpart->face = reverseFace(player.atkpart->face);
+					player.recent = "You twisted " + player.atkpart->name + " " + FacePosToString(player.atkpart->face);
+				}
+				updateBodyPartPos(&player, player.atkpart);
 				break;
 			case 3:
 				player.atkpart = &player.bodyparts[7];
-				break;
-			case 4:
-				
 				break;
 			}
 			break;
@@ -1069,9 +885,6 @@ int main() {
 			case 3:
 				player.atkpart = &player.bodyparts[8];
 				break;
-			case 4:
-				
-				break;
 			}
 			break;
 		case KEY_0:
@@ -1081,9 +894,6 @@ int main() {
 				break;
 			case 3:
 				player.atkpart = &player.bodyparts[9];
-				break;
-			case 4:
-				
 				break;
 			}
 			break;
@@ -1095,9 +905,6 @@ int main() {
 			case 3:
 				player.atkpart = &player.bodyparts[10];
 				break;
-			case 4:
-				
-				break;
 			}
 			break;
 		case KEY_EQUAL:
@@ -1107,9 +914,6 @@ int main() {
 				break;
 			case 3:
 				player.atkpart = &player.bodyparts[11];
-				break;
-			case 4:
-
 				break;
 			}
 			break;
@@ -1132,7 +936,6 @@ int main() {
 			turnnum += 10;
 			break;
 		}
-		//updateBodyPartPos(&enemy);
 		wprintw(win2, "STATS\n");
 		wprintw(win2, "--------------------\n");
 		for (auto& i : player.bodyparts) {
@@ -1152,7 +955,7 @@ int main() {
 			else if (i.fatigue < 0) {
 				i.fatigue = 0;
 			}
-			std::string temp = i.name + " " + PosToString(i.mpos, i.spos) + "; Fatigue:" + std::to_string(i.fatigue) + "; Power:" + std::to_string(i.power) + "\n ";
+			std::string temp = i.name + " " + PosToString(i.mpos, i.spos) + " " + FacePosToString(i.face) + "; Fatigue:" + std::to_string(i.fatigue) + "; Power:" + std::to_string(i.power) + "\n ";
 			wprintw(win2, temp.c_str());
 		}
 		wprintw(win2, "--------------------\n");
@@ -1160,7 +963,7 @@ int main() {
 		std::string temp3 = player.target->recent + "\n";
 		wprintw(win2, temp3.c_str());
 		for (auto& i : enemy.bodyparts) {
-			std::string temp = i.name + " " + PosToString(i.mpos, i.spos) + "; Fatigue:" + std::to_string(i.fatigue) + "; Power:" + std::to_string(i.power) + "\n ";
+			std::string temp = i.name + " " + PosToString(i.mpos, i.spos) + " " + FacePosToString(i.face) + "; Fatigue:" + std::to_string(i.fatigue) + "; Power:" + std::to_string(i.power) + "\n ";
 			wprintw(win2, temp.c_str());
 		}
 		wprintw(win2, "--------------------\n");
@@ -1171,7 +974,6 @@ int main() {
 			wprintw(win3, "1:Choose Body Target\n");
 			wprintw(win3, "2:Choose your Body Part to Use\n");
 			wprintw(win3, "3:Choose Action\n");
-			wprintw(win3, "4:Action for your Own Body\n");
 			break;
 		case 1:
 			for (auto& i : player.target->bodyparts) {
@@ -1205,6 +1007,7 @@ int main() {
 			wprintw(win3, "5:Wrench Backwards\n");
 			wprintw(win3, "6:Lift Up\n");
 			wprintw(win3, "7:Press Down\n");
+			wprintw(win3, "8:Twist\n");
 			wprintw(win3, "Press escape to go back\n");
 			break;
 		case 3:
@@ -1227,21 +1030,6 @@ int main() {
 				wprintw(win3, temp.c_str());
 				num++;
 			}
-			wprintw(win3, "Press escape to go back\n");
-			break;
-		case 4:
-			if (player.atkpart->attached != NULL) {
-				std::string tem = "Can't move " + player.atkpart->name + " freely, attached to target " + player.atkpart->attached->name + "\n";
-				wprintw(win3, tem.c_str());
-			}
-			else {
-				std::string tem = player.atkpart->name + " unattached can move freely\n";
-				wprintw(win3, tem.c_str());
-			}
-			wprintw(win3, "1:Push Forward\n");
-			wprintw(win3, "2:Wrench Backwards\n");
-			wprintw(win3, "3:Lift Up\n");
-			wprintw(win3, "4:Press Down\n");
 			wprintw(win3, "Press escape to go back\n");
 			break;
 		}

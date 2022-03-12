@@ -32,7 +32,8 @@ enum class SpacePos {FORWARD, BACK, UNDEFINED};
 enum class Facing {UP, DOWN, UNDEFINED};
 //Enemy ai personalities, maybe just use function pointers to update them
 enum class Personal {DEFENSIVE, AGGRESIVE, PATIENT, SCARED};
-
+//Enemy states
+enum class State {DEFEND, ATTACK, REST, RUN};
 
 struct Tile {
 	int x;
@@ -55,6 +56,7 @@ struct Part {
 	std::string name;
 	Part* attached;
 	int n;
+	int importance;
 };
 struct ActionContext {
 	Actions action;
@@ -68,6 +70,12 @@ struct Mcont {
 	int n;
 	std::vector<ActionContext> acs;
 };
+//Used to tell entities what parts are connected to them from another entity
+struct PartConnector {
+	Part* mpart;
+	Part* attpart;
+};
+
 
 struct Entity {
 	int x;
@@ -82,7 +90,9 @@ struct Entity {
 	std::string name;
 	Context conts[17];
 	Mcont mconts[12];
-	void (*update)(Entity* e);
+	Personal person;
+	State state;
+	std::vector<PartConnector> pcs;
 };
 
 
@@ -120,43 +130,55 @@ void initParts(Entity* e) {
 		switch (i) {
 		case 0:
 			e->bodyparts[i].name = "Core";
+			e->bodyparts[i].importance = 85;
 			break;
 		case 1:
 			e->bodyparts[i].name = "Right Leg";
+			e->bodyparts[i].importance = 50;
 			break;
 		case 2:
 			e->bodyparts[i].name = "Left Leg";
+			e->bodyparts[i].importance = 50;
 			break;
 		case 3:
 			e->bodyparts[i].name = "Back";
+			e->bodyparts[i].importance = 90;
 			break;
 		case 4:
 			e->bodyparts[i].name = "Left Arm";
+			e->bodyparts[i].importance = 40;
 			break;
 		case 5:
 			e->bodyparts[i].name = "Right Arm";
+			e->bodyparts[i].importance = 40;
 			break;
 		case 6:
 			e->bodyparts[i].name = "Neck";
+			e->bodyparts[i].importance = 80;
 			break;
 		case 7:
 			e->bodyparts[i].name = "Hips";
+			e->bodyparts[i].importance = 75;
 			break;
 		case 8:
 			e->bodyparts[i].name = "Right Hand";
+			e->bodyparts[i].importance = 30;
 			break;
 		case 9:
 			e->bodyparts[i].name = "Left Hand";
+			e->bodyparts[i].importance = 30;
 			break;
 		case 10:
 			e->bodyparts[i].name = "Right Foot";
 			e->bodyparts[i].mpos = MatPos::ONMAT;
 			e->bodyparts[i].spos = SpacePos::FORWARD;
+			e->bodyparts[i].importance = 70;
 			break;
 		case 11:
 			e->bodyparts[i].name = "Left Foot";
 			e->bodyparts[i].mpos = MatPos::ONMAT;
 			e->bodyparts[i].spos = SpacePos::FORWARD;
+			e->bodyparts[i].importance = 70;
 			break;
 		}
 	}
@@ -245,6 +267,21 @@ int rollBasic() {
 	return roll;
 }
 
+
+bool checkTileRange(Entity* p, Entity* e) {
+	if (p->tile == e->tile || p->tile == e->tile - 20 || p->tile == e->tile + 20 || p->tile == e->tile-1 || p->tile == e->tile+1 || p->tile == e->tile-21 || p->tile == e->tile-19 || p->tile == e->tile + 21 || p->tile == e->tile + 19) {
+		return true;
+	}
+
+	return false;
+}
+void findAttachedLimbs(std::vector<Part*>& temps, Part parts[12]) {
+	for (int i = 0; i < 12; i++) {
+		if (parts[i].attached != NULL) {
+			temps.push_back(&parts[i]);
+		}
+	}
+}
 
 //Implement context checking for shots(so can't grab leg unless leg ONMAT), do a seperate vector of contexts for limbs to check for a movement
 void updateBodyPartPos(Entity *e, Part* part) {
@@ -532,8 +569,6 @@ void initMConts(Entity* e){
 	}
 }
 
-
-
 void generateEnemy(Entity* e, Entity *p) {
 	e->x = 20;
 	e->y = 14;
@@ -547,6 +582,22 @@ void generateEnemy(Entity* e, Entity *p) {
 	initEntityContext(e);
 	initMConts(e);
 	//Put AI generation here
+	int roll = rand() % 3;
+	e->state = State::DEFEND;
+	switch (roll) {
+	case 0:
+		e->person = Personal::DEFENSIVE;
+		break;
+	case 1:
+		e->person = Personal::AGGRESIVE;
+		break;
+	case 2:
+		e->person = Personal::PATIENT;
+		break;
+	case 3:
+		e->person = Personal::SCARED;
+		break;
+	}
 }
 
 
@@ -554,6 +605,7 @@ void generateEnemy(Entity* e, Entity *p) {
 //https://github.com/wmcbrine/PDCurses/blob/master/docs/MANUAL.md
 //https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/
 //Add enemy AI, use a state machine based on enemy's personality(enum)
+//Add some way for you resist movements from enemy and vice versa(Maybe an action you can sit in that will make it really hard to twist or move you)
 //Add simple generation for matches, tournaments for dungeons? Can make decisons what to do between matches for basic roll if good or bad effect happens from this
 //Stat increases based off matches
 //Add practice throughout the week if time
@@ -573,11 +625,11 @@ int main() {
 	wrefresh(win);
 	wrefresh(win2);
 	wrefresh(win3);
-	Entity player = { 10, 10, 250};
+	Entity player = { 10, 12, 250};
 	player.action = Actions::PUSH;
 	player.name = "Player";
 	
-	Entity enemy = { 20, 14, 230};
+	Entity enemy = { 20, 11, 230};
 	enemy.name = "Enemy";
 	enemy.target = &player;
 	enemy.btarget = &player.bodyparts[0];
@@ -588,11 +640,10 @@ int main() {
 	player.btarget = &enemy.bodyparts[0];
 	player.atkpart = &player.bodyparts[8];
 	initParts(&player);
-	initParts(&enemy);
 	initEntityContext(&player);
-	initEntityContext(&enemy);
 	initMConts(&player);
-	initMConts(&enemy);
+
+	generateEnemy(&enemy, &player);
 
 	Tile tiles[400];
 	initTiles(tiles);
@@ -616,6 +667,7 @@ int main() {
 		case KEY_LEFT:
 			if (tiles[player.tile - 1].t == ' ') {
 				player.tile--;
+				player.x--;
 				player.recent = "You moved left";
 				turnnum += 10;
 			}
@@ -623,6 +675,7 @@ int main() {
 		case KEY_RIGHT:
 			if (tiles[player.tile + 1].t == ' ') {
 				player.tile++;
+				player.x++;
 				player.recent = "You moved right";
 				turnnum += 10;
 			}
@@ -630,6 +683,7 @@ int main() {
 		case KEY_DOWN:
 			if (tiles[player.tile + 20].t == ' ') {
 				player.tile += 20;
+				player.y++;
 				player.recent = "You moved back";
 				turnnum += 10;
 			}
@@ -637,6 +691,7 @@ int main() {
 		case KEY_UP:
 			if (tiles[player.tile - 20].t == ' ') {
 				player.tile -= 20;
+				player.y--;
 				player.recent = "You moved forwards";
 				turnnum += 10;
 			}
@@ -654,6 +709,10 @@ int main() {
 				player.btarget = &player.target->bodyparts[0];
 				break;
 			case 2:
+				if (!checkTileRange(&player, player.target)) {
+					player.recent = "Not in range of target!";
+					break;
+				}
 				if (player.atkpart->name == "Core" || player.atkpart->name == "Back" || player.atkpart->name == "Hips") {
 					player.recent = "You can't grab with " + player.atkpart->name;
 					break;
@@ -690,6 +749,10 @@ int main() {
 				player.btarget = &player.target->bodyparts[1];
 				break;
 			case 2:
+				if (!checkTileRange(&player, player.target)) {
+					player.recent = "Not in range of target!";
+					break;
+				}
 				if (player.atkpart->attached != NULL) {
 					player.recent = "You can't push " + player.atkpart->name + " attached to " + player.atkpart->attached->name;
 					break;
@@ -707,7 +770,7 @@ int main() {
 				player.btarget->spos = SpacePos::BACK;
 				player.atkpart->face = Facing::UP;
 				player.btarget->health -= player.atkpart->power;
-				player.btarget->fatigue += 1;
+				player.btarget->fatigue += 3;
 				turnnum += 6;
 				updateBodyPartPos(&player, player.atkpart);
 				updateBodyPartPos(&enemy, player.btarget);
@@ -726,6 +789,10 @@ int main() {
 				player.btarget = &player.target->bodyparts[2];
 				break;
 			case 2:
+				if (!checkTileRange(&player, player.target)) {
+					player.recent = "Not in range of target!";
+					break;
+				}
 				if (player.atkpart->attached == NULL) {
 					player.recent = "You can't release " + player.atkpart->name + " unattached";
 					break;
@@ -985,9 +1052,16 @@ int main() {
 			turnnum += 10;
 			break;
 		}
+		bool removeattach = false;
+		if (!checkTileRange(&player, player.target)) {
+			removeattach = true;
+		}
 		wprintw(win2, "STATS\n");
 		wprintw(win2, "--------------------\n");
 		for (auto& i : player.bodyparts) {
+			if (removeattach) {
+				i.attached = NULL;
+			}
 			if (i.attached != NULL) {
 				if (turnchanged) {
 					i.fatigue += 3;
@@ -1154,6 +1228,93 @@ int main() {
 				//Insert call to death here
 			}
 			//Put enemy AI here
+			int roll = rollBasic();
+			std::vector<Part*> temps;
+			findAttachedLimbs(temps, enemy.bodyparts);
+			std::sort(temps.begin(), temps.end());
+			enemy.pcs.clear();
+			for (auto& i : player.bodyparts) {
+				if (i.attached != NULL) {
+					for (auto j : enemy.bodyparts) {
+						if (i.attached == &j) {
+							PartConnector p = { &j, &i };
+							enemy.pcs.push_back(p);
+						}
+					}
+				}
+			}
+			int r;
+			switch (enemy.state) {
+			case State::DEFEND:
+				//Need to put here it reacting to anything you try to do, so if you try to wrench a limb it will grab that limb you are using
+				if (roll > 70) {
+					//Will try to grab onto random limb, will then activate an indicator, so it's next turn it will try and wrench you down
+					//enemy.state = State::ATTACK;
+				}
+				else if (roll > 30) {
+					//Will just push on random limb
+					enemy.action = Actions::PUSH;
+					if (!checkTileRange(&enemy, &player)) {
+						enemy.recent = "Enemy tried to push you but was out of range";
+						break;
+					}
+					r = rand() % 11;
+					enemy.atkpart = &enemy.bodyparts[r];
+					r = rand() % 11;
+					enemy.btarget = &player.bodyparts[r];
+					if (rollLimb(enemy.atkpart, enemy.btarget) < 40) {
+						enemy.recent = "Failed to push " + enemy.btarget->name;
+						break;
+					}
+					if (!checkMoveCont(&enemy, enemy.atkpart)) {
+						break;
+					}
+					enemy.recent = "Enemy pushed at " + enemy.btarget->name + " using " + enemy.atkpart->name;
+					enemy.atkpart->spos = SpacePos::FORWARD;
+					enemy.btarget->spos = SpacePos::BACK;
+					enemy.atkpart->face = Facing::UP;
+					enemy.btarget->health -= enemy.atkpart->power;
+					enemy.btarget->fatigue += 3;
+					turnnum += 6;
+					updateBodyPartPos(&player, enemy.atkpart);
+					updateBodyPartPos(&enemy, enemy.btarget);
+				}
+				//Put in ai trying to remove your attached limbs
+				if (enemy.pcs.size() > 0) {
+					r = rand() % enemy.pcs.size();
+					if (rollLimb(enemy.pcs[r].mpart, enemy.pcs[r].attpart) > 40) {
+						enemy.pcs[r].attpart->attached = NULL;
+						enemy.pcs.erase(enemy.pcs.begin() + r);
+						enemy.recent = "Target removed " + enemy.pcs[r].attpart->name + " from their " + enemy.pcs[r].mpart->name;
+					}
+					else {
+						enemy.recent = "Target tried to remove " + enemy.pcs[r].attpart->name + " from their " + enemy.pcs[r].mpart->name;
+					}
+				}
+				break;
+			case State::ATTACK:
+				//In this state will just ignore limbs you have attached and just try to wrench any limbs it has attached to you down
+				if (roll > 50) {
+					//Try to press all limbs down, and if the limb selected is on the mat already try to twist it over, maybe add limb selection so it targets limbs that will help it pin you
+				}
+				else if (roll > 20) {
+					
+				}
+				break;
+			case State::REST:
+				//Will just stayback and do nothing besides from to time removing limbs you attach, will try to move away from you, but will stay in action distance
+				if (roll > 60) {
+						
+				}
+				break;
+			case State::RUN:
+				//Will try to move out of action distance, make this super short so as not frustrating to player
+
+				break;
+			}
+
+
+
 			turnchanged = false;
 			turnnum = 0;
 		}

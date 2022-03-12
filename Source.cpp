@@ -2,6 +2,8 @@
 #include <string>
 #include <time.h>
 #include <random>
+#include <vector>
+#include <algorithm>
 #include <curses.h>
 #define KEY_1 49
 #define KEY_2 50
@@ -93,7 +95,11 @@ struct Entity {
 	Personal person;
 	State state;
 	std::vector<PartConnector> pcs;
+	int type;
 };
+struct {
+	bool operator()(Part* a, Part* b) const { return a > b; }
+} partSortGreater;
 
 
 void initTiles(Tile tiles[]) {
@@ -252,6 +258,29 @@ Facing reverseFace(Facing face) {
 			return Facing::DOWN;
 			break;
 	}
+	return Facing::UNDEFINED;
+}
+MatPos reverseMatPos(MatPos mat) {
+	switch (mat) {
+	case MatPos::ONMAT:
+		return MatPos::INAIR;
+		break;
+	case MatPos::INAIR:
+		return MatPos::ONMAT;
+		break;
+	}
+	return MatPos::UNDEFINED;
+}
+SpacePos reverseSpacePos(SpacePos space) {
+	switch (space) {
+	case SpacePos::BACK:
+		return SpacePos::FORWARD;
+		break;
+	case SpacePos::FORWARD:
+		return SpacePos::BACK;
+		break;
+	}
+	return SpacePos::UNDEFINED;
 }
 
 
@@ -531,30 +560,44 @@ void initActionCont(std::vector<ActionContext>& acs, int n){
 			break;
 		}
 }
-//Get this to work fuckkkkkkkkkk
 bool checkMoveCont(Entity* e, Part* part) {
 	for (auto& i : e->mconts[part->n].acs) {
 		if (i.action == e->action) {
-			e->recent = "action found";
+			//e->recent = "action found";
 			for (int j = 0; j < i.pos.size(); j++) {
 				for (auto& k : e->bodyparts) {
 					if (k.n == i.pos[j]) {
 						if (k.mpos == i.mpos[j]) {
-							e->recent = "Can't do action " + k.name + " is " + MatPosToString(k.mpos);
-							return false;
+							if (e->type == 1) {
+								k.mpos = reverseMatPos(k.mpos);
+							}
+							else {
+								e->recent = "Can't do action " + k.name + " is " + MatPosToString(k.mpos);
+								return false;
+							}
 						}
 						else if (k.spos == i.spos[j]) {
-							e->recent = "Can't do action " + k.name + " is " + SpacePosToString(k.spos);
-							return false;
+							if (e->type == 1) {
+								k.spos = reverseSpacePos(k.spos);
+							}
+							else {
+								e->recent = "Can't do action " + k.name + " is " + SpacePosToString(k.spos);
+								return false;
+							}
 						}
 						else if (k.face == i.face[j]) {
-							e->recent = "Can't do action " + k.name + " is facing" + FacePosToString(k.face);
-							return false;
+							if (e->type == 1) {
+								k.face = reverseFace(k.face);
+							}
+							else {
+								e->recent = "Can't do action " + k.name + " is facing" + FacePosToString(k.face);
+								return false;
+							}
 						}
 					}
 				}
 			}
-			e->recent = "No out of place limbs found";
+			//e->recent = "No out of place limbs found";
 			return true;
 		}
 	}
@@ -570,14 +613,15 @@ void initMConts(Entity* e){
 }
 
 void generateEnemy(Entity* e, Entity *p) {
-	e->x = 20;
-	e->y = 14;
+	e->x = 10;
+	e->y = 11;
 	e->tile = 230;
 	e->name = "Enemy";
 	e->target = p;
 	e->btarget = &p->bodyparts[0];
 	e->atkpart = &e->bodyparts[8];
 	e->action = Actions::PUSH;
+	e->type = 1;
 	initParts(e);
 	initEntityContext(e);
 	initMConts(e);
@@ -628,8 +672,9 @@ int main() {
 	Entity player = { 10, 12, 250};
 	player.action = Actions::PUSH;
 	player.name = "Player";
+	player.type = 0;
 	
-	Entity enemy = { 20, 11, 230};
+	Entity enemy = { 10, 11, 230};
 	enemy.name = "Enemy";
 	enemy.target = &player;
 	enemy.btarget = &player.bodyparts[0];
@@ -1231,12 +1276,13 @@ int main() {
 			int roll = rollBasic();
 			std::vector<Part*> temps;
 			findAttachedLimbs(temps, enemy.bodyparts);
-			std::sort(temps.begin(), temps.end());
+			//Need to make function to sort these based on limb importance
+			std::sort(temps.begin(), temps.end(), partSortGreater);
 			enemy.pcs.clear();
 			for (auto& i : player.bodyparts) {
 				if (i.attached != NULL) {
 					for (auto j : enemy.bodyparts) {
-						if (i.attached == &j) {
+						if (i.attached->n == j.n) {
 							PartConnector p = { &j, &i };
 							enemy.pcs.push_back(p);
 						}
@@ -1244,11 +1290,81 @@ int main() {
 				}
 			}
 			int r;
+			//Need to add enemy movement
 			switch (enemy.state) {
 			case State::DEFEND:
-				//Need to put here it reacting to anything you try to do, so if you try to wrench a limb it will grab that limb you are using
+				if (!checkTileRange(&enemy, &player)) {
+					if (player.x < enemy.x) {
+						int dif = player.tile - enemy.tile;
+						if (tiles[enemy.tile - 1].type != 1) {
+							enemy.x--;
+							enemy.tile--;
+						}
+						}
+						else {
+							if (tiles[enemy.tile + 1].type != 1) {
+								enemy.tile++;
+								enemy.x++;
+							}
+						}
+						if (enemy.y < player.y) {
+							if (tiles[enemy.tile + 20].type != 1) {
+								enemy.tile += 20;
+								enemy.y++;
+							}
+						}
+						else {
+							if (tiles[enemy.tile - 20].type != 1) {
+								enemy.tile -= 20;
+								enemy.y--;
+							}
+						}
+					
+				}
+				else {
+					if (player.tile == enemy.tile) {
+						if (tiles[enemy.tile + 20].type != 1) {
+							enemy.tile += 20;
+							enemy.y++;
+						}
+						else if (tiles[enemy.tile - 20].type != 1) {
+							enemy.tile -= 20;
+							enemy.y--;
+						}
+						else if (tiles[enemy.tile + 1].type != 1) {
+							enemy.tile++;
+							enemy.x++;
+						}
+						else if (tiles[enemy.tile - 1].type != 1) {
+							enemy.tile--;
+							enemy.x--;
+						}
+					}
+				}
+				//Need to add resistance to attempted twisting
 				if (roll > 70) {
 					//Will try to grab onto random limb, will then activate an indicator, so it's next turn it will try and wrench you down
+					//Figure out how to do random grab of parts from a set list, instead of in a range
+					r = rand() % 11;
+					enemy.atkpart = &enemy.bodyparts[r];
+					r = rand() % 11;
+					enemy.btarget = &player.bodyparts[r];
+					enemy.action = Actions::GRAB;
+					if (!checkTileRange(&enemy, &player)) {
+						enemy.recent = "Enemy tried to grab you but was out of range";
+						break;
+					}
+					if (!checkMoveCont(&enemy, enemy.atkpart)) {
+						break;
+					}
+					if (rollLimb(player.atkpart, player.btarget) < 35) {
+						enemy.recent = "Failed to grab " + enemy.btarget->name;
+						break;
+					}
+					enemy.atkpart->attached = enemy.btarget;
+					updateBodyPartPos(&enemy, enemy.atkpart);
+					enemy.recent = "Enemy grabbed " + enemy.btarget->name + " using " + enemy.atkpart->name;
+					enemy.atkpart->fatigue += 1;
 					//enemy.state = State::ATTACK;
 				}
 				else if (roll > 30) {
@@ -1275,27 +1391,56 @@ int main() {
 					enemy.atkpart->face = Facing::UP;
 					enemy.btarget->health -= enemy.atkpart->power;
 					enemy.btarget->fatigue += 3;
-					turnnum += 6;
+					enemy.atkpart->fatigue++;
 					updateBodyPartPos(&player, enemy.atkpart);
 					updateBodyPartPos(&enemy, enemy.btarget);
 				}
 				//Put in ai trying to remove your attached limbs
 				if (enemy.pcs.size() > 0) {
-					r = rand() % enemy.pcs.size();
-					if (rollLimb(enemy.pcs[r].mpart, enemy.pcs[r].attpart) > 40) {
-						enemy.pcs[r].attpart->attached = NULL;
-						enemy.pcs.erase(enemy.pcs.begin() + r);
-						enemy.recent = "Target removed " + enemy.pcs[r].attpart->name + " from their " + enemy.pcs[r].mpart->name;
+					std::vector<PartConnector> out;
+					std::sample(enemy.pcs.begin(), enemy.pcs.end(), std::back_inserter(out), 1, std::mt19937{ std::random_device{}() });
+					if (rollLimb(out[0].mpart, out[0].attpart) > 50) {
+						out[0].attpart->attached = NULL;
+						enemy.recent = "Target removed " + out[0].attpart->name + " from their " + out[0].mpart->name;
 					}
 					else {
-						enemy.recent = "Target tried to remove " + enemy.pcs[r].attpart->name + " from their " + enemy.pcs[r].mpart->name;
+						enemy.recent = "Target tried to remove " + out[0].attpart->name + " from their " + out[0].mpart->name;
 					}
 				}
 				break;
 			case State::ATTACK:
+				if (!checkTileRange(&enemy, &player)) {
+					if (player.x < enemy.x) {
+						int dif = player.tile - enemy.tile;
+						if (tiles[enemy.tile - 1].type != 1) {
+							enemy.x--;
+							enemy.tile--;
+						}
+					}
+					else {
+						if (tiles[enemy.tile + 1].type != 1) {
+							enemy.tile++;
+							enemy.x++;
+						}
+					}
+					if (enemy.y < player.y) {
+						if (tiles[enemy.tile + 20].type != 1) {
+							enemy.tile += 20;
+							enemy.y++;
+						}
+					}
+					else {
+						if (tiles[enemy.tile - 20].type != 1) {
+							enemy.tile -= 20;
+							enemy.y--;
+						}
+					}
+
+				}
 				//In this state will just ignore limbs you have attached and just try to wrench any limbs it has attached to you down
 				if (roll > 50) {
 					//Try to press all limbs down, and if the limb selected is on the mat already try to twist it over, maybe add limb selection so it targets limbs that will help it pin you
+
 				}
 				else if (roll > 20) {
 					
@@ -1303,12 +1448,123 @@ int main() {
 				break;
 			case State::REST:
 				//Will just stayback and do nothing besides from to time removing limbs you attach, will try to move away from you, but will stay in action distance
+				if (!checkTileRange(&enemy, &player)) {
+					if (player.x < enemy.x) {
+						int dif = player.tile - enemy.tile;
+						if (tiles[enemy.tile - 1].type != 1) {
+							enemy.x--;
+							enemy.tile--;
+						}
+					}
+					else {
+						if (tiles[enemy.tile + 1].type != 1) {
+							enemy.tile++;
+							enemy.x++;
+						}
+					}
+					if (enemy.y < player.y) {
+						if (tiles[enemy.tile + 20].type != 1) {
+							enemy.tile += 20;
+							enemy.y++;
+						}
+					}
+					else {
+						if (tiles[enemy.tile - 20].type != 1) {
+							enemy.tile -= 20;
+							enemy.y--;
+						}
+					}
+
+				}
+				else {
+					if (player.tile == enemy.tile) {
+						if (tiles[enemy.tile + 20].type != 1) {
+							enemy.tile += 20;
+							enemy.y++;
+						}
+						else if (tiles[enemy.tile - 20].type != 1) {
+							enemy.tile -= 20;
+							enemy.y--;
+						}
+						else if (tiles[enemy.tile + 1].type != 1) {
+							enemy.tile++;
+							enemy.x++;
+						}
+						else if (tiles[enemy.tile - 1].type != 1) {
+							enemy.tile--;
+							enemy.x--;
+						}
+					}
+				}
 				if (roll > 60) {
-						
+					//Add check to see if most tired limbs are below a certain threshold at which point change over to Defend
+				}
+				if (enemy.pcs.size() > 0) {
+					std::vector<PartConnector> out;
+					std::sample(enemy.pcs.begin(), enemy.pcs.end(), std::back_inserter(out), 1, std::mt19937{ std::random_device{}() });
+					if (rollLimb(out[0].mpart, out[0].attpart) > 65) {
+						out[0].attpart->attached = NULL;
+						enemy.recent = "Target removed " + out[0].attpart->name + " from their " + out[0].mpart->name;
+					}
+					else {
+						enemy.recent = "Target tried to remove " + out[0].attpart->name + " from their " + out[0].mpart->name;
+					}
 				}
 				break;
 			case State::RUN:
-				//Will try to move out of action distance, make this super short so as not frustrating to player
+				//Will try to move out of action distance, make this super short so as not be frustrating to player
+				if (!checkTileRange(&enemy, &player)) {
+					if (player.x < enemy.x) {
+						int dif = player.tile - enemy.tile;
+						if (tiles[enemy.tile + 1].type != 1) {
+							enemy.tile++;
+							enemy.x++;
+						}
+					}
+					else {
+						if (tiles[enemy.tile - 1].type != 1) {
+							enemy.x--;
+							enemy.tile--;
+						}
+					}
+					if (enemy.y < player.y) {
+						if (tiles[enemy.tile - 20].type != 1) {
+							enemy.tile -= 20;
+							enemy.y--;
+						}
+						
+					}
+					else {
+						if (tiles[enemy.tile + 20].type != 1) {
+							enemy.tile += 20;
+							enemy.y++;
+						}
+					}
+
+				}
+				else {
+					if (player.tile == enemy.tile) {
+						if (tiles[enemy.tile + 20].type != 1) {
+							enemy.tile += 20;
+							enemy.y++;
+						}
+						else if (tiles[enemy.tile - 20].type != 1) {
+							enemy.tile -= 20;
+							enemy.y--;
+						}
+						else if (tiles[enemy.tile + 1].type != 1) {
+							enemy.tile++;
+							enemy.x++;
+						}
+						else if (tiles[enemy.tile - 1].type != 1) {
+							enemy.tile--;
+							enemy.x--;
+						}
+					}
+				}
+				if (roll > 50) {
+					enemy.state = State::DEFEND;
+				}
 
 				break;
 			}

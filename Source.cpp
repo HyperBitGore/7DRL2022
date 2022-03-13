@@ -98,6 +98,7 @@ struct Entity {
 	State state;
 	std::vector<PartConnector> pcs;
 	int type;
+	int upgradepoints;
 };
 struct {
 	bool operator()(Part* a, Part* b) const { return a > b; }
@@ -297,6 +298,9 @@ int rollLimb(Part* atkpart, Part* epart) {
 		movemod = 35;
 		atkpart->fatigue += 1;
 	}
+	if (atkpart->held) {
+		return 0;
+	}
 
 	int roll = rand() % 100 - atkpart->fatigue + atkpart->power - epart->power + epart->fatigue - movemod;
 	return roll;
@@ -401,7 +405,7 @@ void initEntityContext(Entity* e) {
 	for (int i = 0; i < 15; i++) {
 		switch (i) {
 		case 0:
-			initContext(&e->conts[0], { 0, 1, 2, 7, 10, 11}, "Core", 0);
+			initContext(&e->conts[0], { 0, 1, 2, 3, 7, 10, 11}, "Core", 0);
 			break;
 		case 1:
 			initContext(&e->conts[1], { 1, 10 }, "Right Leg", 0);
@@ -664,18 +668,14 @@ void generateEnemy(Entity* e, Entity *p) {
 		break;
 	}
 }
-void tournamentHandler() { 
-	
-}
 
 
 
 //https://github.com/wmcbrine/PDCurses/blob/master/docs/MANUAL.md
 //https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/
 //Add simple generation for matches, tournaments for dungeons? Can make decisons what to do between matches for basic roll if good or bad effect happens from this
-//Stat increases based off matches
+//Add AI trying to move it's limbs off of the mat
 //Add only being able to do certain actions on target limbs if they are in certain positons, really just MatPos for lower body limbs
-//Add practice throughout the week if time
 //If time do fancy coloring of tiles
 int main() {
 	srand(time(NULL));
@@ -707,6 +707,7 @@ int main() {
 	player.target = &enemy;
 	player.btarget = &enemy.bodyparts[0];
 	player.atkpart = &player.bodyparts[8];
+	player.upgradepoints = 0;
 	initParts(&player);
 	initEntityContext(&player);
 	initMConts(&player);
@@ -729,14 +730,38 @@ int main() {
 		wclear(win3);
 		int key = getch();
 		if(displayemode == 0){
-		if (turnnum >= turnmax) {
-			turnchanged = true;
-			playerturn = false;
-		}
 		std::string keycode = std::to_string(key);
 		Part* t = NULL;
+		bool cont;
 		switch (key) {
 		case KEY_LEFT:
+			if (turnchanged) {
+				player.recent = "Not your turn";
+				break;
+			}
+			for (int i = 0; i < 10; i++) {
+				if (player.bodyparts[i].mpos == MatPos::ONMAT) {
+					player.recent = "You can't move over " + player.bodyparts[i].name + " is on the mat";
+					break;
+				}
+			}
+			cont = true;
+			for (int i = 0; i < 12; i++) {
+				for (int j = 0; j < 12; j++) {
+					if (&player.bodyparts[i] == enemy.bodyparts[j].attached) {
+						cont = false;
+					}
+				}
+			}
+			if (!cont) {
+				if(rollBasic() > 30){
+					player.recent = "Removed limbs and moved";
+				}
+				else {
+					player.recent = "Couldn't remove an attached limb, so you're stuck";
+					break;
+				}
+			}
 			if (tiles[player.tile - 1].t == ' ') {
 				player.tile--;
 				player.x--;
@@ -745,6 +770,33 @@ int main() {
 			}
 			break;
 		case KEY_RIGHT:
+			if (turnchanged) {
+				player.recent = "Not your turn";
+				break;
+			}
+			for (int i = 0; i < 10; i++) {
+				if (player.bodyparts[i].mpos == MatPos::ONMAT) {
+					player.recent = "You can't move over " + player.bodyparts[i].name + " is on the mat";
+					break;
+				}
+			}
+			cont = true;
+			for (int i = 0; i < 12; i++) {
+				for (int j = 0; j < 12; j++) {
+					if (&player.bodyparts[i] == enemy.bodyparts[j].attached) {
+						cont = false;
+					}
+				}
+			}
+			if (!cont) {
+				if (rollBasic() > 30) {
+					player.recent = "Removed limbs and moved";
+				}
+				else {
+					player.recent = "Couldn't remove an attached limb, so you're stuck";
+					break;
+				}
+			}
 			if (tiles[player.tile + 1].t == ' ') {
 				player.tile++;
 				player.x++;
@@ -753,6 +805,33 @@ int main() {
 			}
 			break;
 		case KEY_DOWN:
+			if (turnchanged) {
+				player.recent = "Not your turn";
+				break;
+			}
+			for (int i = 0; i < 10; i++) {
+				if (player.bodyparts[i].mpos == MatPos::ONMAT) {
+					player.recent = "You can't move over " + player.bodyparts[i].name + " is on the mat";
+					break;
+				}
+			}
+			cont = true;
+			for (int i = 0; i < 12; i++) {
+				for (int j = 0; j < 12; j++) {
+					if (&player.bodyparts[i] == enemy.bodyparts[j].attached) {
+						cont = false;
+					}
+				}
+			}
+			if (!cont) {
+				if (rollBasic() > 30) {
+					player.recent = "Removed limbs and moved";
+				}
+				else {
+					player.recent = "Couldn't remove an attached limb, so you're stuck";
+					break;
+				}
+			}
 			if (tiles[player.tile + 20].t == ' ') {
 				player.tile += 20;
 				player.y++;
@@ -761,6 +840,33 @@ int main() {
 			}
 			break;
 		case KEY_UP:
+			if (turnchanged) {
+				player.recent = "Not your turn";
+				break;
+			}
+			for (int i = 0; i < 10; i++) {
+				if (player.bodyparts[i].mpos == MatPos::ONMAT) {
+					player.recent = "You can't move over " + player.bodyparts[i].name + " is on the mat";
+					break;
+				}
+			}
+			cont = true;
+			for (int i = 0; i < 12; i++) {
+				for (int j = 0; j < 12; j++) {
+					if (&player.bodyparts[i] == enemy.bodyparts[j].attached) {
+						cont = false;
+					}
+				}
+			}
+			if (!cont) {
+				if (rollBasic() > 30) {
+					player.recent = "Removed limbs and moved";
+				}
+				else {
+					player.recent = "Couldn't remove an attached limb, so you're stuck";
+					break;
+				}
+			}
 			if (tiles[player.tile - 20].t == ' ') {
 				player.tile -= 20;
 				player.y--;
@@ -781,6 +887,10 @@ int main() {
 				player.btarget = &player.target->bodyparts[0];
 				break;
 			case 2:
+				if (turnchanged) {
+					player.recent = "Not your turn";
+					break;
+				}
 				if (!checkTileRange(&player, player.target)) {
 					player.recent = "Not in range of target!";
 					break;
@@ -821,6 +931,10 @@ int main() {
 				player.btarget = &player.target->bodyparts[1];
 				break;
 			case 2:
+				if (turnchanged) {
+					player.recent = "Not your turn";
+					break;
+				}
 				if (!checkTileRange(&player, player.target)) {
 					player.recent = "Not in range of target!";
 					break;
@@ -861,6 +975,10 @@ int main() {
 				player.btarget = &player.target->bodyparts[2];
 				break;
 			case 2:
+				if (turnchanged) {
+					player.recent = "Not your turn";
+					break;
+				}
 				if (!checkTileRange(&player, player.target)) {
 					player.recent = "Not in range of target!";
 					break;
@@ -892,6 +1010,10 @@ int main() {
 				player.btarget = &player.target->bodyparts[3];
 				break;
 			case 2:
+				if (turnchanged) {
+					player.recent = "Not your turn";
+					break;
+				}
 				player.action = Actions::PUSH;
 				if (!checkMoveCont(&player, player.atkpart)) {
 					break;
@@ -929,6 +1051,10 @@ int main() {
 				player.btarget = &player.target->bodyparts[4];
 				break;
 			case 2:
+				if (turnchanged) {
+					player.recent = "Not your turn";
+					break;
+				}
 				player.action = Actions::WRENCH;
 				if (!checkMoveCont(&player, player.atkpart)) {
 					break;
@@ -966,6 +1092,10 @@ int main() {
 				player.btarget = &player.target->bodyparts[5];
 				break;
 			case 2:
+				if (turnchanged) {
+					player.recent = "Not your turn";
+					break;
+				}
 				player.action = Actions::LIFT;
 				if (!checkMoveCont(&player, player.atkpart)) {
 					break;
@@ -1004,11 +1134,15 @@ int main() {
 				player.btarget = &player.target->bodyparts[6];
 				break;
 			case 2:
+				if (turnchanged) {
+					player.recent = "Not your turn";
+					break;
+				}
 				player.action = Actions::PRESS;
 				if (!checkMoveCont(&player, player.atkpart)) {
 					break;
 				}
-				turnnum += 2;
+				turnnum += 4;
 				if (player.atkpart->attached != NULL) {
 					if (rollLimb(player.atkpart, player.btarget) > 40) {
 						player.recent = "Failed to press down attached " + player.atkpart->attached->name;
@@ -1039,7 +1173,12 @@ int main() {
 				player.btarget = &player.target->bodyparts[7];
 				break;
 			case 2:
+				if (turnchanged) {
+					player.recent = "Not your turn";
+					break;
+				}
 				player.action = Actions::TWIST;
+				turnnum += 3;
 				if (!checkMoveCont(&player, player.atkpart)) {
 					break;
 				}
@@ -1072,7 +1211,12 @@ int main() {
 				player.btarget = &player.target->bodyparts[8];
 				break;
 			case 2:
+				if (turnchanged) {
+					player.recent = "Not your turn";
+					break;
+				}
 				player.action = Actions::RESIST;
+				turnnum += 3;
 				t = findAttachedPart(player.atkpart, &enemy);
 				if (t != NULL) {
 					if (rollLimb(player.atkpart, t) > 55) {
@@ -1101,8 +1245,13 @@ int main() {
 				player.btarget = &player.target->bodyparts[9];
 				break;
 			case 2:
+				if (turnchanged) {
+					player.recent = "Not your turn";
+					break;
+				}
 				player.action = Actions::REMOVE;
 				t = findAttachedPart(player.atkpart, &enemy);
+				turnnum += 2;
 				if (t != NULL) {
 					if (rollLimb(player.atkpart, t) > 55) {
 						t->attached = NULL;
@@ -1127,7 +1276,12 @@ int main() {
 				player.btarget = &player.target->bodyparts[10];
 				break;
 			case 2:
+				if (turnchanged) {
+					player.recent = "Not your turn";
+					break;
+				}
 				player.action = Actions::HOLD;
+				turnnum += 5;
 				if (player.atkpart->attached != NULL) {
 					if (rollLimb(player.atkpart, player.atkpart->attached) > 50) {
 						player.atkpart->attached->held = true;
@@ -1159,24 +1313,6 @@ int main() {
 				player.atkpart = &player.bodyparts[11];
 				break;
 			}
-			break;
-		case KEY_Q:
-			//Move away
-			//Roll to see if you can get away from enemy, this will release grabs enemy has on you
-			player.action = Actions::AWAY;
-			turnnum += 10;
-			break;
-		case KEY_W:
-			//Move Behind
-			//Roll to see if you can get by enemy
-			player.action = Actions::BEHIND;
-			turnnum += 10;
-			break;
-		case KEY_E:
-			//Move on Top
-			//Check if enemy is on mat
-			player.action = Actions::TOP;
-			turnnum += 10;
 			break;
 		}
 		bool removeattach = false;
@@ -1263,6 +1399,7 @@ int main() {
 			wprintw(win3, "8:Twist\n");
 			wprintw(win3, "9:Resist\n");
 			wprintw(win3, "0:Remove Attached Limb\n");
+			wprintw(win3, "-:Hold Down Limb\n");
 			wprintw(win3, "Press escape to go back\n");
 			break;
 		case 3:
@@ -1288,11 +1425,6 @@ int main() {
 			wprintw(win3, "Press escape to go back\n");
 			break;
 		}
-		wprintw(win3, "--------------------\n");
-		wprintw(win3, "COMPLEX MOVEMENTS\n");
-		wprintw(win3, "Q:Move Away\n");
-		wprintw(win3, "W:Move Behind\n");
-		wprintw(win3, "E:Move On Top\n");
 		wprintw(win3, "--------------------\n");
 		wprintw(win3, "BODY AWARENESS\n");
 		std::string temp = "Targeting: " + player.btarget->name + " on " + enemy.name + "\n";
@@ -1338,10 +1470,10 @@ int main() {
 			}
 			j++;
 		}
-		//presents screen changes
-		wrefresh(win);
-		wrefresh(win2);
-		wrefresh(win3);
+		if (turnnum >= turnmax) {
+			turnchanged = true;
+			playerturn = false;
+		}
 		if (turnchanged) {
 			if (player.target->bodyparts[3].mpos == MatPos::ONMAT && player.target->bodyparts[3].face == Facing::DOWN) {
 				ebturns++;
@@ -1350,14 +1482,14 @@ int main() {
 				pbturns++;
 			}
 			if (ebturns >= 3) {
-				enemy.recent = "You pinned your enemy!";
+				player.recent = "You pinned your enemy!";
 				ebturns = 0;
 				matcheswon++;
-				tournamentHandler();
+				player.upgradepoints += 10;
 				displayemode = 2;
 			}
 			if (pbturns >= 3) {
-				enemy.recent = "You got pinned!?";
+				player.recent = "You got pinned!?";
 				pbturns = 0;
 				player.x = 10;
 				player.y = 12;
@@ -1365,6 +1497,7 @@ int main() {
 				player.action = Actions::PUSH;
 				player.name = "Player";
 				player.type = 0;
+				player.upgradepoints = 0;
 				enemy.x = 10;
 				enemy.y = 11;
 				enemy.tile = 230;
@@ -1391,7 +1524,6 @@ int main() {
 				displayemode = 3;
 			}
 			//Put enemy AI here
-			int roll = rollBasic();
 			std::vector<Part*> temps;
 			findAttachedLimbs(temps, enemy.bodyparts);
 			std::sort(temps.begin(), temps.end(), partSortGreater);
@@ -1419,7 +1551,71 @@ int main() {
 					enemy.state = State::REST;
 				}
 			}
+			if (enemy.bodyparts[3].face == Facing::DOWN) {
+				if (enemy.bodyparts[3].attached != NULL) {
+					if (rollLimb(&enemy.bodyparts[3], enemy.bodyparts[3].attached) > 30) {
+						enemy.recent = "Enemy failed to twist attached " + temps[0]->attached->name;
+						
+					}
+					else {
+						enemy.bodyparts[3].attached->face = reverseFace(enemy.bodyparts[3].attached->face);
+						enemy.bodyparts[3].face = reverseFace(enemy.bodyparts[3].face);
+						enemy.recent = "Enemy twisted his back up";
+						enemy.bodyparts[3].attached->health -= enemy.bodyparts[3].power;
+						enemy.bodyparts[3].attached->fatigue += 5;
+						updateBodyPartPos(&enemy, &enemy.bodyparts[3]);
+						updateBodyPartPos(&player, enemy.bodyparts[3].attached);
+						enemy.state = State::DEFEND;
+					}
+				}
+				else {
+					if (rollBasic() > 50) {
+						enemy.action = Actions::TWIST;
+						enemy.bodyparts[3].face = reverseFace(player.atkpart->face);
+						enemy.recent = "Enemy twisted his back up";
+						updateBodyPartPos(&enemy, &enemy.bodyparts[3]);
+						enemy.state = State::DEFEND;
+					}
+				}
+			}
+			if (rollBasic() > 55) {
+				Part* ph = NULL;
+				for (int i = temps.size() - 1; i >= 0; i--) {
+					if (!temps[i]->attached->moveable) {
+						ph = temps[i];
+					}
+				}
+				if (ph != NULL) {
+					if (rollLimb(ph, ph->attached) > 50) {
+						enemy.action = Actions::HOLD;
+						ph->attached->held = true;
+						ph->moveable = false;
+						ph->attached->health -= 2;
+						ph->attached->fatigue += 3;
+						ph->fatigue += 2;
+						enemy.recent = "Enemy holding down " + ph->attached->name + " with " + ph->name;
+					}
+				}
+				else {
+					if (rollBasic() > 35) {
+						//Pick random limb to hold down
+						std::vector<Part*> out;
+						if (temps.size() > 0) {
+							std::sample(temps.begin(), temps.end(), std::back_inserter(out), 1, std::mt19937{ std::random_device{}() });
+							Part* p = out[0];
+							enemy.action = Actions::HOLD;
+							p->attached->held = true;
+							p->moveable = false;
+							p->attached->health -= 2;
+							p->attached->fatigue += 3;
+							p->fatigue += 2;
+							enemy.recent = "Enemy holding down " + p->attached->name + " with " + p->name;
+						}
+					}
+				}
+			}
 			int r;
+			int roll = rollBasic();
 			//Need to add the three new Actions
 			switch (enemy.state) {
 			case State::DEFEND:
@@ -1471,15 +1667,23 @@ int main() {
 						}
 					}
 				}
-				//Need to add resistance to attempted twisting
 				if (roll > 70) {
 					//Will try to grab onto random limb, will then activate an indicator, so it's next turn it will try and wrench you down
 					//Figure out how to do random grab of parts from a set list, instead of in a range
 					r = rand() % 11;
 					enemy.atkpart = &enemy.bodyparts[r];
-					r = rand() % 11;
-					enemy.btarget = &player.bodyparts[r];
+					if (enemy.atkpart->n == 3) {
+						enemy.atkpart = &enemy.bodyparts[8];
+					}
 					enemy.action = Actions::GRAB;
+					int bpchk[12] = { 6, 0, 7, 3, 1, 2, 10, 11, 4, 5, 8, 9 };
+					MatPos mp[12] = { MatPos::ONMAT, MatPos::INAIR, MatPos::INAIR, MatPos::INAIR, MatPos::INAIR, MatPos::ONMAT, MatPos::ONMAT, MatPos::INAIR, MatPos::INAIR, MatPos::INAIR, MatPos::INAIR, MatPos::INAIR};
+					for (int i = 0; i < 12; i++) {
+						if (player.bodyparts[bpchk[i]].mpos == mp[i]) {
+							enemy.btarget = &player.bodyparts[bpchk[i]];
+							break;
+						}
+					}
 					if (!checkTileRange(&enemy, &player)) {
 						enemy.recent = "Enemy tried to grab you but was out of range";
 						break;
@@ -1524,6 +1728,9 @@ int main() {
 					enemy.atkpart->fatigue++;
 					updateBodyPartPos(&player, enemy.atkpart);
 					updateBodyPartPos(&enemy, enemy.btarget);
+				}
+				else {
+					enemy.recent = "Enemy hesitated too much";
 				}
 				//Tries to remove any limbs you have attached to it
 				if (enemy.pcs.size() > 0) {
@@ -1572,57 +1779,17 @@ int main() {
 					}
 
 				}
-				r = rollBasic();
-				if (r > 55) {
-					Part* ph = NULL;
-					for (int i = temps.size() - 1; i >= 0; i--) {
-							if (!temps[i]->attached->moveable) {
-								ph = temps[i];
-							}
-					}
-					if (ph != NULL) {
-						if (rollLimb(ph, ph->attached) > 50) {
-							enemy.action = Actions::HOLD;
-							ph->attached->held = true;
-							ph->moveable = false;
-							ph->attached->health -= 2;
-							ph->attached->fatigue += 3;
-							ph->fatigue += 2;
-							enemy.recent = "Enemy holding down " + ph->attached->name + " with " + ph->name;
-						}
-					}
-					else {
-						r = rollBasic();
-						if (r > 35) {
-							//Pick random limb to hold down
-							std::vector<Part*> out;
-							if (temps.size() > 0) {
-								std::sample(temps.begin(), temps.end(), std::back_inserter(out), 1, std::mt19937{ std::random_device{}() });
-								Part* p = out[0];
-								enemy.action = Actions::HOLD;
-								p->attached->held = true;
-								p->moveable = false;
-								p->attached->health -= 2;
-								p->attached->fatigue += 3;
-								p->fatigue += 2;
-								enemy.recent = "Enemy holding down " + p->attached->name + " with " + p->name;
-							}
-						}
-					}
-				}
 				//In this state will just ignore limbs you have attached and just try to wrench any limbs it has attached to you down
-				if (roll > 50) {
+				if (roll > 30) {
 					//Try to press all limbs down, and if the limb selected is on the mat already try to twist it over, maybe add limb selection so it targets limbs that will help it pin you
 					if (temps.size() > 0) {
 						if (temps[0]->attached->mpos == MatPos::ONMAT) {
-							if (temps[0]->attached->face == Facing::UP) {
-								break;
-							}
+							
 							enemy.action = Actions::TWIST;
 							if (!checkMoveCont(&enemy, temps[0])) {
 								break;
 							}
-							if (rollLimb(temps[0], temps[0]->attached) > 40) {
+							if (rollLimb(temps[0], temps[0]->attached) > 30) {
 								enemy.recent = "Enemy failed to twist attached " + temps[0]->attached->name;
 								break;
 							}
@@ -1633,6 +1800,7 @@ int main() {
 							temps[0]->attached->fatigue += 5;
 							updateBodyPartPos(&enemy, temps[0]);
 							updateBodyPartPos(&player, temps[0]->attached);
+							enemy.state = State::DEFEND;
 						}
 						else {
 							enemy.action = Actions::PRESS;
@@ -1653,15 +1821,16 @@ int main() {
 							updateBodyPartPos(&player, temps[0]->attached);
 						}
 					}
-				}
-				else if (roll > 20) {
-					r = rollBasic();
-					if (r > 85) {
+					else {
 						enemy.state = State::DEFEND;
 					}
 				}
+				else {
+					enemy.recent = "Enemy hesitated too much";
+				}
 				break;
 			case State::REST:
+				enemy.recent = "Enemy resting!";
 				//Will just stayback and do nothing besides from to time removing limbs you attach, will try to move away from you, but will stay in action distance
 				if (!checkTileRange(&enemy, &player)) {
 					if (player.x < enemy.x) {
@@ -1716,6 +1885,9 @@ int main() {
 						enemy.state = State::DEFEND;
 					}
 				}
+				else {
+					enemy.recent = "Enemy hesitated too much";
+				}
 				if (enemy.pcs.size() > 0) {
 					std::vector<PartConnector> out;
 					std::sample(enemy.pcs.begin(), enemy.pcs.end(), std::back_inserter(out), 1, std::mt19937{ std::random_device{}() });
@@ -1735,6 +1907,7 @@ int main() {
 				break;
 			case State::RUN:
 				//Will try to move out of action distance, make this super short so as not be frustrating to player
+				enemy.recent = "Enemy running!";
 				if (!checkTileRange(&enemy, &player)) {
 					if (player.x < enemy.x) {
 						int dif = player.tile - enemy.tile;
@@ -1801,6 +1974,10 @@ int main() {
 			turnchanged = false;
 			turnnum = 0;
 		}
+		//presents screen changes
+		wrefresh(win);
+		wrefresh(win2);
+		wrefresh(win3);
 	}
 	else if (displayemode == 1) {
 		wclear(win);
@@ -1814,9 +1991,9 @@ int main() {
 			exitf = true;
 			break;
 		}
-		wprintw(win, "SELECT WHAT TO DO\n");
-		wprintw(win, "1:Play\n");
-		wprintw(win, "2:Exit\n");
+		wprintw(win2, "SELECT WHAT TO DO\n");
+		wprintw(win2, "1:Play\n");
+		wprintw(win2, "2:Exit\n");
 		wrefresh(win);
 		wrefresh(win2);
 		wrefresh(win3);
@@ -1833,9 +2010,9 @@ int main() {
 		displayemode = 5;
 		break;
 	}
-	wprintw(win, "YOU WON, 10 POWER POINTS GAINED, SELECT WHAT TO DO NEXT");
-	wprintw(win, "1:Select limb to focus on to increase muscle growth overnight");
-	wprintw(win, "2:Go to bed immediately and not use your current points");
+	wprintw(win2, "YOU WON, 10 POWER POINTS GAINED, SELECT WHAT TO DO NEXT\n");
+	wprintw(win2, "1:Select limb to focus on to increase muscle growth overnight\n");
+	wprintw(win2, "2:Go to bed immediately and not use your current points\n");
 	wrefresh(win);
 	wrefresh(win2);
 	wrefresh(win3);
@@ -1849,17 +2026,160 @@ int main() {
 		displayemode = 1;
 		break;
 	}
-	wprintw(win, "YOU LOST\n");
-	wprintw(win, "Press 1 to return to menu");
+	wprintw(win2, "YOU LOST\n");
+	wprintw(win2, "Press 1 to return to menu");
 		wrefresh(win);
 		wrefresh(win2);
 		wrefresh(win3);
 	}
 	else if (displayemode == 4) {
-		
+	wclear(win);
+	wclear(win2);
+	wclear(win3);
+	switch (key) {
+	case KEY_1:
+		if (player.upgradepoints > 0) {
+			player.bodyparts[0].power++;
+			player.upgradepoints--;
+		}
+		break;
+	case KEY_2:
+		if (player.upgradepoints > 0) {
+			player.bodyparts[1].power++;
+			player.upgradepoints--;
+		}
+		break;
+	case KEY_3:
+		if (player.upgradepoints > 0) {
+			player.bodyparts[2].power++;
+			player.upgradepoints--;
+		}
+		break;
+	case KEY_4:
+		if (player.upgradepoints > 0) {
+			player.bodyparts[3].power++;
+			player.upgradepoints--;
+		}
+		break;
+	case KEY_5:
+		if (player.upgradepoints > 0) {
+			player.bodyparts[4].power++;
+			player.upgradepoints--;
+		}
+		break;
+	case KEY_6:
+		if (player.upgradepoints > 0) {
+			player.bodyparts[5].power++;
+			player.upgradepoints--;
+		}
+		break;
+	case KEY_7:
+		if (player.upgradepoints > 0) {
+			player.bodyparts[6].power++;
+			player.upgradepoints--;
+		}
+		break;
+	case KEY_8:
+		if (player.upgradepoints > 0) {
+			player.bodyparts[7].power++;
+			player.upgradepoints--;
+		}
+		break;
+	case KEY_9:
+		if (player.upgradepoints > 0) {
+			player.bodyparts[8].power++;
+			player.upgradepoints--;
+		}
+		break;
+	case KEY_0:
+		if (player.upgradepoints > 0) {
+			player.bodyparts[9].power++;
+			player.upgradepoints--;
+		}
+		break;
+	case KEY_MINUS:
+		if (player.upgradepoints > 0) {
+			player.bodyparts[10].power++;
+			player.upgradepoints--;
+		}
+		break;
+	case KEY_EQUAL:
+		if (player.upgradepoints > 0) {
+			player.bodyparts[11].power++;
+			player.upgradepoints--;
+		}
+		break;
+	case KEY_Q:
+		if (player.upgradepoints > 1) {
+			turnmax++;
+			player.upgradepoints -= 2;
+		}
+		break;
+	case 27:
+		displayemode = 5;
+		break;
+	}
+	wprintw(win2, "LIMBS TO UPGRADE\n");
+	std::string te = "Upgrade Points: " + std::to_string(player.upgradepoints) + "\n";
+	wprintw(win2, te.c_str());
+	for (int i = 0; i < 12; i++) {
+		std::string temp = std::to_string(i + 1) + ":" + player.bodyparts[i].name + " Power: " + std::to_string(player.bodyparts[i].power) + "\n";
+		switch (i) {
+		case 9:
+			temp = "0:" + player.bodyparts[i].name + " Power: " + std::to_string(player.bodyparts[i].power) + "\n";
+			break;
+		case 10:
+			temp = "-:" + player.bodyparts[i].name + " Power: " + std::to_string(player.bodyparts[i].power) + "\n";
+			break;
+		case 11:
+			temp = "=:" + player.bodyparts[i].name + " Power: " + std::to_string(player.bodyparts[i].power) + "\n";
+			break;
+		}
+		wprintw(win2, temp.c_str());
+	}
+	wprintw(win2, "Press Q to increase conditiong\n");
+	wprintw(win2, "Press escape to go to sleep\n");
+	wrefresh(win);
+	wrefresh(win2);
+	wrefresh(win3);
 	}
 	else if (displayemode == 5) {
-		
+	wclear(win);
+	wclear(win2);
+	wclear(win3);
+	switch (key) {
+	case KEY_1:
+		displayemode = 0;
+		pbturns = 0;
+		player.x = 10;
+		player.y = 12;
+		player.tile = 250;
+		player.action = Actions::PUSH;
+		enemy.x = 10;
+		enemy.y = 11;
+		enemy.tile = 230;
+		enemy.name = "Enemy";
+		enemy.target = &player;
+		enemy.btarget = &player.bodyparts[0];
+		enemy.atkpart = &enemy.bodyparts[8];
+		enemy.action = Actions::PUSH;
+		player.target = &enemy;
+		player.btarget = &enemy.bodyparts[0];
+		player.atkpart = &player.bodyparts[8];
+		turnnum = 0;
+		playerturn = true;
+		turnchanged = false;
+		actionmode = 0;
+		ebturns = 0;
+		pbturns = 0;
+		generateEnemy(&enemy, &player);
+		break;
+	}
+	wprintw(win2, "You slept through the night, back to the tournament\n");
+	wprintw(win2, "Press 1 to wrestle your next match\n");
+	wrefresh(win);
+	wrefresh(win2);
+	wrefresh(win3);
 	}
 
 
